@@ -1,0 +1,26 @@
+{
+  "name": "example",
+  "version": "0.0.0",
+  "private": "true",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "serve": "vite preview"
+  },
+  "dependencies": {
+    "cesium": "1.99.0",
+    "cesium-mvt-imargery-provider": "../",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "resium": "^1.15.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.17",
+    "@types/react-dom": "^18.0.6",
+    "@vitejs/plugin-react": "^2.0.1",
+    "typescript": "~4.8.0",
+    "vite": "^3.0.9",
+    "vite-plugin-cesium": "^1.2.22"
+  }
+}

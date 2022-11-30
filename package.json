@@ -26,7 +26,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=16"
   },
   "peerDependencies": {
     "cesium": "1.x"

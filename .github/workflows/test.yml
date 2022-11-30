@@ -3,8 +3,8 @@ name: test
 on: push
 
 jobs:
-  test:
-    name: test
+  lib:
+    name: lib
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -24,6 +24,34 @@ jobs:
         run: yarn lint
       - name: Run build
         run: yarn build
-      - name: Run build example
+      - uses: actions/upload-artifact@v3
+        with:
+          name: lib-output
+          path: dist
+
+  example:
+    name: example
+    runs-on: ubuntu-latest
+    needs: lib
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: lib-output
+          path: dist
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path-for-example
+        run: echo "path=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
+        with:
+          path: ${{ steps.yarn-cache-dir-path-for-example.outputs.path }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Run install
+        working-directory: example
+        run: yarn install --frozen-lockfile
+      - name: Run build
         working-directory: example
         run: yarn build

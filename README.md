@@ -38,4 +38,4 @@ See example directory for more details.
 6. Then example cesium application is started
 
 If you run example, you need to set sample MVT data to `./example/public`.
-And you should change `layerName` option for `MVTImageryProvider`.
+And you should change `layerName` option for `MVTImageryProvider` in `./example/src/Imagery.tsx`.

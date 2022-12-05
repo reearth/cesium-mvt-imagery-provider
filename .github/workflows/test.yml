@@ -52,6 +52,8 @@ jobs:
       - name: Run install
         working-directory: example
         run: yarn install --frozen-lockfile
+      - name: Link library
+        run: yarn link && yarn link "cesium-mvt-imagery-provider"
       - name: Run build
         working-directory: example
         run: yarn build

@@ -17,6 +17,15 @@ import Pbf from "pbf";
 
 import { isFeatureClicked } from "./terria";
 
+const defaultParseTile = async (url?: string) => {
+  const ab = await fetchResourceAsArrayBuffer(url);
+  if (!ab) {
+    return;
+  }
+  const tile = parseMVT(ab);
+  return tile;
+};
+
 type TileCoordinates = {
   x: number;
   y: number;
@@ -41,6 +50,7 @@ type ImageryProviderOption = {
   credit?: string;
   style?: (feature: VectorTileFeature) => Style;
   onSelectFeature?: (feature: VectorTileFeature) => ImageryLayerFeatureInfo | void;
+  parseTile?: (url?: string) => Promise<VectorTile | undefined>;
 };
 
 type ImageryProviderTrait = ImageryProvider;
@@ -55,6 +65,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private _currentUrl?: string;
   private _style?: (feature: VectorTileFeature) => Style;
   private _onSelectFeature?: (feature: VectorTileFeature) => ImageryLayerFeatureInfo | void;
+  private _parseTile: (url?: string) => Promise<VectorTile | undefined>;
 
   // Internal variables
   private readonly _tilingScheme: WebMercatorTilingScheme;
@@ -72,6 +83,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._credit = options.credit;
     this._style = options.style;
     this._onSelectFeature = options.onSelectFeature;
+    this._parseTile = options.parseTile ?? defaultParseTile;
 
     this._tilingScheme = new WebMercatorTilingScheme();
 
@@ -188,13 +200,9 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     canvas: HTMLCanvasElement,
     requestedTile: TileCoordinates,
   ): Promise<HTMLCanvasElement> {
-    const ab = await fetchResourceAsArrayBuffer(this._currentUrl);
-    if (!ab) {
-      return canvas;
-    }
-    const tile = parseMVT(ab);
+    const tile = await this._parseTile(this._currentUrl);
 
-    const layer = tile.layers[this._layerName];
+    const layer = tile?.layers[this._layerName];
     if (!layer) {
       return canvas;
     }

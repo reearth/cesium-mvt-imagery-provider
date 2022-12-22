@@ -9,7 +9,7 @@ export const Imagery: FC = () => {
     const imageryProvider = new MVTImageryProvider({
       urlTemplate: "http://localhost:8080/sample_mvt/{z}/{x}/{y}.mvt",
       layerName: "layerName",
-      style: _feature => {
+      style: (_feature, _tileCoords) => {
         if (isFeatureSelected) {
           return {
             strokeStyle: "orange",

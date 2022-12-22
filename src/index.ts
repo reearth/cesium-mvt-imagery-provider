@@ -48,7 +48,7 @@ type ImageryProviderOption = {
   maximumLevel?: number;
   maximumNativeZoom?: number;
   credit?: string;
-  style?: (feature: VectorTileFeature) => Style;
+  style?: (feature: VectorTileFeature, tileCoords: TileCoordinates) => Style;
   onSelectFeature?: (feature: VectorTileFeature) => ImageryLayerFeatureInfo | void;
   parseTile?: (url?: string) => Promise<VectorTile | undefined>;
 };
@@ -63,7 +63,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _layerName: string;
   private readonly _credit?: string;
   private _currentUrl?: string;
-  private _style?: (feature: VectorTileFeature) => Style;
+  private _style?: (feature: VectorTileFeature, tileCoords: TileCoordinates) => Style;
   private _onSelectFeature?: (feature: VectorTileFeature) => ImageryLayerFeatureInfo | void;
   private _parseTile: (url?: string) => Promise<VectorTile | undefined>;
 
@@ -220,7 +220,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     for (let i = 0; i < layer.length; i++) {
       const feature = layer.feature(i);
       if (VectorTileFeature.types[feature.type] === "Polygon") {
-        const style = this._style?.(feature);
+        const style = this._style?.(feature, requestedTile);
         if (style) {
           context.fillStyle = style.fillStyle ?? context.fillStyle;
           context.strokeStyle = style.strokeStyle ?? context.strokeStyle;

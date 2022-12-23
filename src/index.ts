@@ -41,6 +41,8 @@ type Style = {
 
 type URLTemplate = `http${"s" | ""}://${string}/{z}/{x}/{y}${string}`;
 
+type FeatureHandler<R> = (feature: VectorTileFeature, tileCoords: TileCoordinates) => R;
+
 type ImageryProviderOption = {
   urlTemplate: URLTemplate;
   layerName: string;
@@ -48,8 +50,10 @@ type ImageryProviderOption = {
   maximumLevel?: number;
   maximumNativeZoom?: number;
   credit?: string;
-  style?: (feature: VectorTileFeature, tileCoords: TileCoordinates) => Style;
-  onSelectFeature?: (feature: VectorTileFeature) => ImageryLayerFeatureInfo | void;
+  onRenderFeature?: FeatureHandler<boolean | void>;
+  onFeaturesRendered?: () => void;
+  style?: FeatureHandler<Style>;
+  onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   parseTile?: (url?: string) => Promise<VectorTile | undefined>;
 };
 
@@ -63,8 +67,10 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _layerName: string;
   private readonly _credit?: string;
   private _currentUrl?: string;
-  private _style?: (feature: VectorTileFeature, tileCoords: TileCoordinates) => Style;
-  private _onSelectFeature?: (feature: VectorTileFeature) => ImageryLayerFeatureInfo | void;
+  private _onRenderFeature?: FeatureHandler<boolean | void>;
+  private _onFeaturesRendered?: () => void;
+  private _style?: FeatureHandler<Style>;
+  private _onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   private _parseTile: (url?: string) => Promise<VectorTile | undefined>;
 
   // Internal variables
@@ -81,6 +87,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._urlTemplate = options.urlTemplate;
     this._layerName = options.layerName;
     this._credit = options.credit;
+    this._onFeaturesRendered = options.onFeaturesRendered;
+    this._onRenderFeature = options.onRenderFeature;
     this._style = options.style;
     this._onSelectFeature = options.onSelectFeature;
     this._parseTile = options.parseTile ?? defaultParseTile;
@@ -219,6 +227,12 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     for (let i = 0; i < layer.length; i++) {
       const feature = layer.feature(i);
+
+      // Early return.
+      if (this._onRenderFeature && !this._onRenderFeature(feature, requestedTile)) {
+        continue;
+      }
+
       if (VectorTileFeature.types[feature.type] === "Polygon") {
         const style = this._style?.(feature, requestedTile);
         if (style) {
@@ -255,6 +269,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
         );
       }
     }
+
+    this._onFeaturesRendered?.();
 
     return canvas;
   }
@@ -326,7 +342,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
         isFeatureClicked(feature.loadGeometry(), point)
       ) {
         if (this._onSelectFeature) {
-          const feat = this._onSelectFeature(feature);
+          const feat = this._onSelectFeature(feature, requestedTile);
           if (feat) {
             features.push(feat);
           }

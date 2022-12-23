@@ -9,6 +9,12 @@ export const Imagery: FC = () => {
     const imageryProvider = new MVTImageryProvider({
       urlTemplate: "http://localhost:8080/sample_mvt/{z}/{x}/{y}.mvt",
       layerName: "layerName",
+      onRenderFeature: () => {
+        console.log("Before rendering feature");
+      },
+      onFeaturesRendered: () => {
+        console.log("After rendering feature");
+      },
       style: (_feature, _tileCoords) => {
         if (isFeatureSelected) {
           return {

@@ -240,6 +240,38 @@
     "@babel/helper-validator-identifier" "^7.19.1"
     to-fast-properties "^2.0.0"
 
+"@cesium/engine@1.1.0":
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/@cesium/engine/-/engine-1.1.0.tgz#0f3e95ded92d23bd24243f38e47728dfb70748d6"
+  integrity sha512-86hL/JNkdph1caBj4EUgmH35mrwpzkpex8IDBEABudE29SUjVawtaaz6u9ZAu1YzUUrzPmznPdCxd6Qg03EE1Q==
+  dependencies:
+    "@tweenjs/tween.js" "^18.6.4"
+    "@zip.js/zip.js" "2.4.x"
+    autolinker "^4.0.0"
+    bitmap-sdf "^1.0.3"
+    dompurify "^2.2.2"
+    earcut "^2.2.4"
+    grapheme-splitter "^1.0.4"
+    jsep "^1.3.8"
+    kdbush "^3.0.0"
+    ktx-parse "^0.4.5"
+    lerc "^2.0.0"
+    mersenne-twister "^1.1.0"
+    meshoptimizer "^0.18.1"
+    pako "^2.0.4"
+    protobufjs "^7.1.0"
+    rbush "^3.0.1"
+    topojson-client "^3.1.0"
+    urijs "^1.19.7"
+
+"@cesium/widgets@1.1.0":
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/@cesium/widgets/-/widgets-1.1.0.tgz#95af3eca1e0f1fd44feab863a5020ef1e3bd5fa7"
+  integrity sha512-3v2QVI9DJjAPhIFbFLXHSENJvgmyD0drGK6qnfXEMoBl1FzcLnBN9bT4gC8yW4jKOH4sCu5o9O5RznhrIQNqOg==
+  dependencies:
+    "@cesium/engine" "1.1.0"
+    nosleep.js "^0.12.0"
+
 "@esbuild/android-arm@0.15.17":
   version "0.15.17"
   resolved "https://registry.yarnpkg.com/@esbuild/android-arm/-/android-arm-0.15.17.tgz#05162390ed2b0f2ae9647a809efb71fba14ddfe7"
@@ -458,10 +490,10 @@ at-least-node@^1.0.0:
   resolved "https://registry.yarnpkg.com/at-least-node/-/at-least-node-1.0.0.tgz#602cd4b46e844ad4effc92a8011a3c46e0238dc2"
   integrity sha512-+q/t7Ekv1EDY2l6Gda6LLiX14rU9TV20Wa3ofeQmwPFZbOMo9DXrLbOjFaaclkXKWidIaopwAObQDqwWtGUjqg==
 
-autolinker@^3.14.3:
-  version "3.16.2"
-  resolved "https://registry.yarnpkg.com/autolinker/-/autolinker-3.16.2.tgz#6bb4f32432fc111b65659336863e653973bfbcc9"
-  integrity sha512-JiYl7j2Z19F9NdTmirENSUUIIL/9MytEWtmzhfmsKPCp9E+G35Y0UNCMoM9tFigxT59qSc8Ml2dlZXOCVTYwuA==
+autolinker@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/autolinker/-/autolinker-4.0.0.tgz#aa1f9a52786b727b0ecee8cd7d4a97e0e3ef59f1"
+  integrity sha512-fl5Kh6BmEEZx+IWBfEirnRUU5+cOiV0OK7PEt0RBKvJMJ8GaRseIOeDU3FKf4j3CE5HVefcjHmhYPOcaVt0bZw==
   dependencies:
     tslib "^2.3.0"
 
@@ -485,30 +517,13 @@ caniuse-lite@^1.0.30001400:
   resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001436.tgz#22d7cbdbbbb60cdc4ca1030ccd6dea9f5de4848b"
   integrity sha512-ZmWkKsnC2ifEPoWUvSAIGyOYwT+keAaaWPHiQ9DfMqS1t6tfuyFYoWR78TeZtznkEQ64+vGXH9cZrElwR2Mrxg==
 
-cesium@1.99.0:
-  version "1.99.0"
-  resolved "https://registry.yarnpkg.com/cesium/-/cesium-1.99.0.tgz#5d978749834bc0c539219fe97d20735d2e67ff06"
-  integrity sha512-bVN7Bskd9PVhQe9Ak9DEr7wEckbCJc0UPq58MKWGWAkQfiYob8odh6luqY5Yz26trr3tWwni1xWjsCe94y37jw==
+cesium@1.101.0:
+  version "1.101.0"
+  resolved "https://registry.yarnpkg.com/cesium/-/cesium-1.101.0.tgz#2c9254e3fbaa4c5c788e0c04d8d4da51826a0c37"
+  integrity sha512-xXMzKxZ8BMm7UJhtOXr6G8PO6YNLamW2XQ72dziM3ujZWdcPtdc782HC9WeykvynMYdSa13yTDUXfIAD38tNHQ==
   dependencies:
-    "@tweenjs/tween.js" "^18.6.4"
-    "@zip.js/zip.js" "2.4.x"
-    autolinker "^3.14.3"
-    bitmap-sdf "^1.0.3"
-    dompurify "^2.2.2"
-    earcut "^2.2.4"
-    grapheme-splitter "^1.0.4"
-    jsep "^0.3.1"
-    kdbush "^3.0.0"
-    ktx-parse "^0.4.5"
-    lerc "^2.0.0"
-    mersenne-twister "^1.1.0"
-    meshoptimizer "^0.18.1"
-    nosleep.js "^0.12.0"
-    pako "^2.0.4"
-    protobufjs "^7.1.0"
-    rbush "^3.0.1"
-    topojson-client "^3.1.0"
-    urijs "^1.19.7"
+    "@cesium/engine" "1.1.0"
+    "@cesium/widgets" "1.1.0"
 
 chalk@^2.0.0:
   version "2.4.2"
@@ -840,10 +855,10 @@ is-reference@^1.2.1:
   resolved "https://registry.yarnpkg.com/js-tokens/-/js-tokens-4.0.0.tgz#19203fb59991df98e3a287050d4647cdeaf32499"
   integrity sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==
 
-jsep@^0.3.1:
-  version "0.3.5"
-  resolved "https://registry.yarnpkg.com/jsep/-/jsep-0.3.5.tgz#3fd79ebd92f6f434e4857d5272aaeef7d948264d"
-  integrity sha512-AoRLBDc6JNnKjNcmonituEABS5bcfqDhQAWWXNTFrqu6nVXBpBAGfcoTGZMFlIrh9FjmE1CQyX9CTNwZrXMMDA==
+jsep@^1.3.8:
+  version "1.3.8"
+  resolved "https://registry.yarnpkg.com/jsep/-/jsep-1.3.8.tgz#facb6eb908d085d71d950bd2b24b757c7b8a46d7"
+  integrity sha512-qofGylTGgYj9gZFsHuyWAN4jr35eJ66qJCK4eKDnldohuUoQFbU3iZn2zjvEbd9wOAhP9Wx5DsAAduTyE1PSWQ==
 
 jsesc@^2.5.1:
   version "2.5.2"

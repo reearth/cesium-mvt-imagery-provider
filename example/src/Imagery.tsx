@@ -11,6 +11,7 @@ export const Imagery: FC = () => {
       layerName: "layerName",
       onRenderFeature: () => {
         console.log("Before rendering feature");
+        return true;
       },
       onFeaturesRendered: () => {
         console.log("After rendering feature");

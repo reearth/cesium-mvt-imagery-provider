@@ -1,6 +1,6 @@
 {
   "name": "cesium-mvt-imagery-provider",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Custom ImageryProvider for mapbox vector tile",
   "source": "./src/index.ts",
   "main": "./dist/cesium-mvt-imagery-provider.umd.js",

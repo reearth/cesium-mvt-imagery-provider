@@ -43,7 +43,7 @@ type URLTemplate = `http${"s" | ""}://${string}/{z}/{x}/{y}${string}`;
 
 type FeatureHandler<R> = (feature: VectorTileFeature, tileCoords: TileCoordinates) => R;
 
-type ImageryProviderOption = {
+export type ImageryProviderOption = {
   urlTemplate: URLTemplate;
   layerName: string;
   minimumLevel?: number;

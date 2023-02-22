@@ -79,6 +79,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _tileHeight: number;
   private readonly _rectangle: Rectangle;
   private readonly _ready: boolean;
+  private readonly _readyPromise: Promise<boolean>;
   private readonly _errorEvent = new CesiumEvent();
 
   constructor(options: ImageryProviderOption) {
@@ -101,6 +102,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     this._rectangle = this._tilingScheme.rectangle;
     this._ready = true;
+    this._readyPromise = Promise.resolve(true);
   }
 
   get url() {
@@ -171,7 +173,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     return <any>undefined;
   }
   get readyPromise() {
-    return <any>undefined;
+    return this._readyPromise;
   }
   get tileDiscardPolicy() {
     return <any>undefined;

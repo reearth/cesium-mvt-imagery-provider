@@ -237,12 +237,13 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
       if (VectorTileFeature.types[feature.type] === "Polygon") {
         const style = this._style?.(feature, requestedTile);
-        if (style) {
-          context.fillStyle = style.fillStyle ?? context.fillStyle;
-          context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
-          context.lineWidth = style.lineWidth ?? context.lineWidth;
-          context.lineJoin = style.lineJoin ?? context.lineJoin;
+        if (!style) {
+          continue;
         }
+        context.fillStyle = style.fillStyle ?? context.fillStyle;
+        context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
+        context.lineWidth = style.lineWidth ?? context.lineWidth;
+        context.lineJoin = style.lineJoin ?? context.lineJoin;
 
         context.beginPath();
 
@@ -259,7 +260,10 @@ export class MVTImageryProvider implements ImageryProviderTrait {
             context.lineTo(pos.x * extentFactor, pos.y * extentFactor);
           }
         }
-        context.stroke();
+
+        if (context.lineWidth > 0) {
+          context.stroke();
+        }
         context.fill();
       } else {
         console.log(
@@ -293,6 +297,9 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
 
     const data = await fetchResourceAsArrayBuffer(url);
+    if (!data) {
+      return [];
+    }
 
     const layer = parseMVT(data).layers[this._layerName];
     if (!layer) {
@@ -372,5 +379,5 @@ const fetchResourceAsArrayBuffer = (url?: string) => {
     throw new Error("fetch request is failed because request url is undefined");
   }
 
-  return Resource.fetchArrayBuffer({ url });
+  return Resource.fetchArrayBuffer({ url })?.catch(() => {});
 };

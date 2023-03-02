@@ -261,7 +261,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           }
         }
 
-        if (!style.lineWidth || style.lineWidth > 0) {
+        if ((style.lineWidth ?? 1) > 0) {
           context.stroke();
         }
         context.fill();

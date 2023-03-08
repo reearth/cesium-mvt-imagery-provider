@@ -13,30 +13,33 @@
       import { Viewer } from "cesium";
       import { MVTImageryProvider } from "./src/index.ts";
       const viewer = new Viewer("root");
-      const blackMarble = viewer.scene.imageryLayers.addImageryProvider(
-        new MVTImageryProvider({
-          urlTemplate: "http://localhost:8080/sample_mvt/{z}/{x}/{y}.mvt",
-          layerName: "layerName",
-          onRenderFeature: () => {
-            console.log("Before rendering feature");
-            return true;
-          },
-          onFeaturesRendered: () => {
-            console.log("After rendering feature");
-          },
-          style: (_feature, _tileCoords) => {
-            return {
-              strokeStyle: "green",
-              fillStyle: "green",
-              lineWidth: 1,
-            };
-          },
-          onSelectFeature: feature => {
-            console.log("selectFeature", feature);
-          },
-          credit: "cesium.js",
-        })
+      const provider = new MVTImageryProvider({
+        urlTemplate: "https://d2jfi34fqvxlsc.cloudfront.net/main/data/mvt/tran/13100_tokyo/{z}/{x}/{y}.mvt",
+        layerName: "road",
+        // onRenderFeature: () => {
+        //   console.log("Before rendering feature");
+        //   return true;
+        // },
+        // onFeaturesRendered: () => {
+        //   console.log("After rendering feature");
+        // },
+        style: (_feature, _tileCoords) => {
+          return {
+            strokeStyle: "green",
+            fillStyle: "green",
+            lineWidth: 1,
+          };
+        },
+        onSelectFeature: feature => {
+          console.log("selectFeature", feature);
+        },
+        credit: "cesium.js",
+        cache: true,
+      });
+      viewer.scene.imageryLayers.addImageryProvider(
+        provider
       );
+      window.MVT_PROVIDER = provider;
     </script>
   </body>
 </html>

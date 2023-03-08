@@ -15,6 +15,7 @@ import {
 } from "cesium";
 import Pbf from "pbf";
 
+import { Cache } from "./cache";
 import { isFeatureClicked } from "./terria";
 
 const defaultParseTile = async (url?: string) => {
@@ -51,10 +52,13 @@ export type ImageryProviderOption = {
   maximumNativeZoom?: number;
   credit?: string;
   onRenderFeature?: FeatureHandler<boolean | void>;
+  onFeatureUpdateNeed?: FeatureHandler<boolean | void>;
   onFeaturesRendered?: () => void;
   style?: FeatureHandler<Style>;
   onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   parseTile?: (url?: string) => Promise<VectorTile | undefined>;
+  cache?: boolean;
+  cacheSize?: number;
 };
 
 type ImageryProviderTrait = ImageryProvider;
@@ -68,6 +72,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _credit?: string;
   private _currentUrl?: string;
   private _onRenderFeature?: FeatureHandler<boolean | void>;
+  private _onFeatureUpdateNeed?: FeatureHandler<boolean | void>;
   private _onFeaturesRendered?: () => void;
   private _style?: FeatureHandler<Style>;
   private _onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
@@ -81,6 +86,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _ready: boolean;
   private readonly _readyPromise: Promise<boolean>;
   private readonly _errorEvent = new CesiumEvent();
+  private readonly _cache: Cache | undefined;
 
   constructor(options: ImageryProviderOption) {
     this._minimumLevel = options.minimumLevel ?? 0;
@@ -90,6 +96,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._credit = options.credit;
     this._onFeaturesRendered = options.onFeaturesRendered;
     this._onRenderFeature = options.onRenderFeature;
+    this._onFeatureUpdateNeed = options.onFeatureUpdateNeed;
     this._style = options.style;
     this._onSelectFeature = options.onSelectFeature;
     this._parseTile = options.parseTile ?? defaultParseTile;
@@ -103,6 +110,9 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._rectangle = this._tilingScheme.rectangle;
     this._ready = true;
     this._readyPromise = Promise.resolve(true);
+    if (options.cache) {
+      this._cache = new Cache(options.cacheSize);
+    }
   }
 
   get url() {
@@ -217,6 +227,26 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       return canvas;
     }
 
+    const key = this._cache?.key(requestedTile.x, requestedTile.y, requestedTile.level);
+    if (this._cache && key) {
+      const cachedCanvas = this._cache.get(key);
+      if (cachedCanvas) {
+        let needUpdate = false;
+        if (this._onFeatureUpdateNeed) {
+          for (let i = 0; i < layer.length; i++) {
+            const feature = layer.feature(i);
+            if (this._onFeatureUpdateNeed(feature, requestedTile)) {
+              needUpdate = true;
+              break;
+            }
+          }
+        }
+        if (!needUpdate) {
+          return cachedCanvas;
+        }
+      }
+    }
+
     const context = canvas.getContext("2d");
     if (!context) {
       return canvas;
@@ -274,6 +304,10 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           ].join("/")}`,
         );
       }
+    }
+
+    if (key) {
+      this._cache?.set(key, canvas);
     }
 
     this._onFeaturesRendered?.();

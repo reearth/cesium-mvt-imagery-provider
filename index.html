@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" style="width: 100%; height: 100%;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MVTImageryProvider</title>
+  </head>
+  <body style="margin: 0; width: 100%; height: 100%;">
+    <div id="root" style="width: 100%; height: 100%;"></div>
+    <script type="module">
+      window.CESIUM_BASE_URL = "/node_modules/cesium/Build/Cesium";
+      import "cesium/Build/Cesium/Widgets/widgets.css";
+      import { Viewer } from "cesium";
+      import { MVTImageryProvider } from "./src/index.ts";
+      const viewer = new Viewer("root");
+      const blackMarble = viewer.scene.imageryLayers.addImageryProvider(
+        new MVTImageryProvider({
+          urlTemplate: "http://localhost:8080/sample_mvt/{z}/{x}/{y}.mvt",
+          layerName: "layerName",
+          onRenderFeature: () => {
+            console.log("Before rendering feature");
+            return true;
+          },
+          onFeaturesRendered: () => {
+            console.log("After rendering feature");
+          },
+          style: (_feature, _tileCoords) => {
+            return {
+              strokeStyle: "green",
+              fillStyle: "green",
+              lineWidth: 1,
+            };
+          },
+          onSelectFeature: feature => {
+            console.log("selectFeature", feature);
+          },
+          credit: "cesium.js",
+        })
+      );
+    </script>
+  </body>
+</html>

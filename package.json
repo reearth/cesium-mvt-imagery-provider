@@ -16,6 +16,7 @@
   "license": "MIT",
   "sideEffects": false,
   "scripts": {
+    "dev": "vite",
     "build": "tsc && vite build",
     "type": "tsc",
     "lint": "eslint .",

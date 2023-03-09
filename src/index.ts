@@ -15,7 +15,19 @@ import {
 } from "cesium";
 import Pbf from "pbf";
 
+import { renderCanvas } from "./canvas";
 import { isFeatureClicked } from "./terria";
+import type {
+  FeatureHandler,
+  RenderRequest,
+  RenderRequests,
+  RenderResponse,
+  Style,
+  TileCoordinates,
+} from "./types";
+import Worker from "./worker?worker&inline";
+
+export type { FeatureHandler, Style, TileCoordinates } from "./types";
 
 const defaultParseTile = async (url?: string) => {
   const ab = await fetchResourceAsArrayBuffer(url);
@@ -26,22 +38,7 @@ const defaultParseTile = async (url?: string) => {
   return tile;
 };
 
-type TileCoordinates = {
-  x: number;
-  y: number;
-  level: number;
-};
-
-type Style = {
-  fillStyle?: string;
-  strokeStyle?: string;
-  lineWidth?: number;
-  lineJoin?: CanvasLineJoin;
-};
-
 type URLTemplate = `http${"s" | ""}://${string}/{z}/{x}/{y}${string}`;
-
-type FeatureHandler<R> = (feature: VectorTileFeature, tileCoords: TileCoordinates) => R;
 
 export type ImageryProviderOption = {
   urlTemplate: URLTemplate;
@@ -50,6 +47,7 @@ export type ImageryProviderOption = {
   maximumLevel?: number;
   maximumNativeZoom?: number;
   credit?: string;
+  enableWorker?: boolean;
   onRenderFeature?: FeatureHandler<boolean | void>;
   onFeaturesRendered?: () => void;
   style?: FeatureHandler<Style>;
@@ -72,6 +70,12 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private _style?: FeatureHandler<Style>;
   private _onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   private _parseTile: (url?: string) => Promise<VectorTile | undefined>;
+
+  // worker
+  private _worker?: Worker;
+  private _workerBatch: RenderRequest[] = [];
+  private _workerInterval?: number;
+  private _workerPromises = new Map<string, () => void>();
 
   // Internal variables
   private readonly _tilingScheme: WebMercatorTilingScheme;
@@ -103,7 +107,40 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._rectangle = this._tilingScheme.rectangle;
     this._ready = true;
     this._readyPromise = Promise.resolve(true);
+
+    if (options.enableWorker && !!HTMLCanvasElement.prototype.transferControlToOffscreen) {
+      this._worker = new Worker();
+      this._worker.addEventListener("message", (ev: MessageEvent<RenderResponse>) => {
+        if (ev.data?.type === "error") {
+          console.error(ev.data.error);
+        } else if (ev.data?.type !== "ok") {
+          return;
+        }
+        const id = ev.data.id;
+        const promise = this._workerPromises.get(id);
+        this._workerPromises.delete(id);
+        promise?.();
+      });
+      this._workerInterval = window.setInterval(this._executeRenderBatch, 100);
+    }
   }
+
+  dispose() {
+    window.clearInterval(this._workerInterval);
+  }
+
+  _executeRenderBatch = () => {
+    if (this._worker && this._workerBatch?.length) {
+      this._worker.postMessage(
+        {
+          type: "renderAll",
+          requests: this._workerBatch,
+        } as RenderRequests,
+        this._workerBatch.flatMap(b => [b.canvas, b.data]),
+      );
+      this._workerBatch = [];
+    }
+  };
 
   get url() {
     return this._currentUrl;
@@ -210,75 +247,63 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     canvas: HTMLCanvasElement,
     requestedTile: TileCoordinates,
   ): Promise<HTMLCanvasElement> {
+    if (this._worker) {
+      return this._renderCanvasOnWorker(canvas, requestedTile);
+    }
+
     const tile = await this._parseTile(this._currentUrl);
-
-    const layer = tile?.layers[this._layerName];
-    if (!layer) {
+    if (!tile) {
       return canvas;
     }
 
-    const context = canvas.getContext("2d");
-    if (!context) {
-      return canvas;
+    try {
+      renderCanvas({
+        tile,
+        canvas,
+        layerName: this._layerName,
+        requestedTile,
+        onFeatureRender: this._onRenderFeature,
+        onFeaturesRendered: this._onFeaturesRendered,
+        styler: this._style,
+      });
+    } catch (err) {
+      console.error(err);
     }
-    context.strokeStyle = "black";
-    context.lineWidth = 1;
-
-    // Vector tile works with extent [0, 4095], but canvas is only [0,255]
-    const extentFactor = canvas.width / layer.extent;
-
-    for (let i = 0; i < layer.length; i++) {
-      const feature = layer.feature(i);
-
-      // Early return.
-      if (this._onRenderFeature && !this._onRenderFeature(feature, requestedTile)) {
-        continue;
-      }
-
-      if (VectorTileFeature.types[feature.type] === "Polygon") {
-        const style = this._style?.(feature, requestedTile);
-        if (!style) {
-          continue;
-        }
-        context.fillStyle = style.fillStyle ?? context.fillStyle;
-        context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
-        context.lineWidth = style.lineWidth ?? context.lineWidth;
-        context.lineJoin = style.lineJoin ?? context.lineJoin;
-
-        context.beginPath();
-
-        const coordinates = feature.loadGeometry();
-
-        // Polygon rings
-        for (let i2 = 0; i2 < coordinates.length; i2++) {
-          let pos = coordinates[i2][0];
-          context.moveTo(pos.x * extentFactor, pos.y * extentFactor);
-
-          // Polygon ring points
-          for (let j = 1; j < coordinates[i2].length; j++) {
-            pos = coordinates[i2][j];
-            context.lineTo(pos.x * extentFactor, pos.y * extentFactor);
-          }
-        }
-
-        if ((style.lineWidth ?? 1) > 0) {
-          context.stroke();
-        }
-        context.fill();
-      } else {
-        console.log(
-          `Unexpected geometry type: ${feature.type} in region map on tile ${[
-            requestedTile.level,
-            requestedTile.x,
-            requestedTile.y,
-          ].join("/")}`,
-        );
-      }
-    }
-
-    this._onFeaturesRendered?.();
 
     return canvas;
+  }
+
+  async _renderCanvasOnWorker(
+    canvas: HTMLCanvasElement,
+    requestedTile: TileCoordinates,
+  ): Promise<HTMLCanvasElement> {
+    if (!this._worker) return canvas;
+    const map = this._workerPromises;
+    const batch = this._workerBatch;
+
+    const data = await fetchResourceAsArrayBuffer(this._currentUrl);
+    if (!data) return canvas;
+
+    const id = tileId(requestedTile, this._layerName);
+    const offscreenCanvas = canvas.transferControlToOffscreen();
+
+    const promise = new Promise<HTMLCanvasElement>(res => {
+      map.set(id, () => res(canvas));
+
+      batch.push({
+        type: "render",
+        id,
+        layerName: this._layerName,
+        canvas: offscreenCanvas,
+        requestedTile,
+        data,
+      });
+    }).then(c => {
+      console.log("RESOLVED", id, c.toDataURL());
+      return c;
+    });
+
+    return promise;
   }
 
   async pickFeatures(
@@ -381,3 +406,6 @@ const fetchResourceAsArrayBuffer = (url?: string) => {
 
   return Resource.fetchArrayBuffer({ url })?.catch(() => {});
 };
+
+const tileId = (tile: TileCoordinates, layer: string): string =>
+  `${tile.level}/${tile.x}/${tile.y}/${layer}`;

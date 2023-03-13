@@ -19,7 +19,8 @@
     "build": "tsc && vite build",
     "type": "tsc",
     "lint": "eslint .",
-    "fmt": "eslint --fix ."
+    "fmt": "eslint --fix .",
+    "link": "yarn link && yarn link cesium-mvt-imagery-provider"
   },
   "files": [
     "src",

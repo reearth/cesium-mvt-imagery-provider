@@ -39,7 +39,7 @@ type Style = {
   lineJoin?: CanvasLineJoin;
 };
 
-type URLTemplate = `http${"s" | ""}://${string}/{z}/{x}/{y}${string}`;
+type URLTemplate = `${`http${"s" | ""}://` | ""}${string}/{z}/{x}/{y}${string}`;
 
 type FeatureHandler<R> = (feature: VectorTileFeature, tileCoords: TileCoordinates) => R;
 

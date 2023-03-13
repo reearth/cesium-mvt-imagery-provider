@@ -7,7 +7,7 @@ export const Imagery: FC = () => {
   const [isFeatureSelected, setIsFeatureSelected] = useState<boolean>(false);
   useEffect(() => {
     const imageryProvider = new MVTImageryProvider({
-      urlTemplate: "http://localhost:8080/sample_mvt/{z}/{x}/{y}.mvt",
+      urlTemplate: "/sample_mvt/{z}/{x}/{y}.mvt",
       layerName: "layerName",
       onRenderFeature: () => {
         console.log("Before rendering feature");

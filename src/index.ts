@@ -203,16 +203,20 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     this._currentUrl = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
 
-    return this._renderCanvas(canvas, requestedTile);
+    const layerNames = this._layerName.split(/, */).filter(Boolean);
+    return Promise.all(layerNames.map(n => this._renderCanvas(canvas, requestedTile, n))).then(
+      () => canvas,
+    );
   }
 
   async _renderCanvas(
     canvas: HTMLCanvasElement,
     requestedTile: TileCoordinates,
+    layerName: string,
   ): Promise<HTMLCanvasElement> {
     const tile = await this._parseTile(this._currentUrl);
 
-    const layer = tile?.layers[this._layerName];
+    const layer = tile?.layers[layerName];
     if (!layer) {
       return canvas;
     }

@@ -217,12 +217,13 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   ): Promise<HTMLCanvasElement> {
     if (!this._currentUrl) return canvas;
 
+    const currentUrl = this._currentUrl;
     const tile = await (async () => {
-      if (!this._currentUrl) return;
-      const cachedTile = this._tileCaches.get(this._currentUrl);
+      if (!currentUrl) return;
+      const cachedTile = this._tileCaches.get(currentUrl);
       if (cachedTile) return cachedTile;
-      const tile = await this._parseTile(this._currentUrl);
-      if (tile) this._tileCaches.set(this._currentUrl, tile);
+      const tile = tileToCacheable(await this._parseTile(currentUrl));
+      if (tile) this._tileCaches.set(currentUrl, tile);
       return tile;
     })();
 
@@ -386,6 +387,33 @@ const buildURLWithTileCoordinates = (template: URLTemplate, tile: TileCoordinate
 
 const parseMVT = (ab?: ArrayBuffer) => {
   return new VectorTile(new Pbf(ab));
+};
+
+const tileToCacheable = (v: VectorTile | undefined) => {
+  if (!v) return;
+  const layers: VectorTile["layers"] = {};
+  for (const [key, value] of Object.entries(v.layers)) {
+    const features: VectorTileFeature[] = [];
+    const layer = value;
+    for (let i = 0; i < layer.length; i++) {
+      const feature = layer.feature(i);
+      const geo = feature.loadGeometry();
+      const bbox = feature.bbox?.();
+      const f: VectorTileFeature = {
+        ...feature,
+        id: feature.id,
+        loadGeometry: () => geo,
+        bbox: bbox ? () => bbox : undefined,
+        toGeoJSON: feature.toGeoJSON,
+      };
+      features.push(f);
+    }
+    layers[key] = {
+      ...layer,
+      feature: i => features[i],
+    };
+  }
+  return { layers };
 };
 
 const fetchResourceAsArrayBuffer = (url?: string) => {

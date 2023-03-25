@@ -81,6 +81,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _ready: boolean;
   private readonly _readyPromise: Promise<boolean>;
   private readonly _errorEvent = new CesiumEvent();
+  private readonly _tileCaches = new Map<string, VectorTile>();
 
   constructor(options: ImageryProviderOption) {
     this._minimumLevel = options.minimumLevel ?? 0;
@@ -214,7 +215,16 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     requestedTile: TileCoordinates,
     layerName: string,
   ): Promise<HTMLCanvasElement> {
-    const tile = await this._parseTile(this._currentUrl);
+    if (!this._currentUrl) return canvas;
+
+    const tile = await (async () => {
+      if (!this._currentUrl) return;
+      const cachedTile = this._tileCaches.get(this._currentUrl);
+      if (cachedTile) return cachedTile;
+      const tile = await this._parseTile(this._currentUrl);
+      if (tile) this._tileCaches.set(this._currentUrl, tile);
+      return tile;
+    })();
 
     const layer = tile?.layers[layerName];
     if (!layer) {

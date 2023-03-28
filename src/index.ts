@@ -379,7 +379,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 }
 
 const buildURLWithTileCoordinates = (template: URLTemplate, tile: TileCoordinates) => {
-  const z = template.replace("{z}", String(tile.level));
+  const decodedTemplate = decodeURIComponent(template);
+  const z = decodedTemplate.replace("{z}", String(tile.level));
   const x = z.replace("{x}", String(tile.x));
   const y = x.replace("{y}", String(tile.y));
   return y;

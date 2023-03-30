@@ -50,6 +50,7 @@ export type ImageryProviderOption = {
   maximumLevel?: number;
   maximumNativeZoom?: number;
   credit?: string;
+  resolution?: number;
   onRenderFeature?: FeatureHandler<boolean | void>;
   onFeaturesRendered?: () => void;
   style?: FeatureHandler<Style>;
@@ -59,6 +60,8 @@ export type ImageryProviderOption = {
 
 type ImageryProviderTrait = ImageryProvider;
 
+const CESIUM_CANVAS_SIZE = 256;
+
 export class MVTImageryProvider implements ImageryProviderTrait {
   // Options
   private readonly _minimumLevel: number;
@@ -66,6 +69,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _urlTemplate: URLTemplate;
   private readonly _layerName: string;
   private readonly _credit?: string;
+  private readonly _resolution?: number;
   private _currentUrl?: string;
   private _onRenderFeature?: FeatureHandler<boolean | void>;
   private _onFeaturesRendered?: () => void;
@@ -89,6 +93,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._urlTemplate = options.urlTemplate;
     this._layerName = options.layerName;
     this._credit = options.credit;
+    this._resolution = options.resolution ?? 5;
     this._onFeaturesRendered = options.onFeaturesRendered;
     this._onRenderFeature = options.onRenderFeature;
     this._style = options.style;
@@ -98,8 +103,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._tilingScheme = new WebMercatorTilingScheme();
 
     // Maybe these pixels are same with Cesium's tile size.
-    this._tileWidth = 256;
-    this._tileHeight = 256;
+    this._tileWidth = CESIUM_CANVAS_SIZE;
+    this._tileHeight = CESIUM_CANVAS_SIZE;
 
     this._rectangle = this._tilingScheme.rectangle;
     this._ready = true;
@@ -193,8 +198,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     _request?: Request | undefined,
   ): Promise<ImageryTypes> | undefined {
     const canvas = document.createElement("canvas");
-    canvas.width = this._tileWidth;
-    canvas.height = this._tileHeight;
 
     const requestedTile: TileCoordinates = {
       x,
@@ -202,18 +205,23 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       level,
     };
 
+    const scaleFactor = (level >= this.maximumLevel ? this._resolution : undefined) ?? 1;
+    canvas.width = this._tileWidth * scaleFactor;
+    canvas.height = this._tileHeight * scaleFactor;
+
     this._currentUrl = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
 
     const layerNames = this._layerName.split(/, */).filter(Boolean);
-    return Promise.all(layerNames.map(n => this._renderCanvas(canvas, requestedTile, n))).then(
-      () => canvas,
-    );
+    return Promise.all(
+      layerNames.map(n => this._renderCanvas(canvas, requestedTile, n, scaleFactor)),
+    ).then(() => canvas);
   }
 
   async _renderCanvas(
     canvas: HTMLCanvasElement,
     requestedTile: TileCoordinates,
     layerName: string,
+    scaleFactor: number,
   ): Promise<HTMLCanvasElement> {
     if (!this._currentUrl) return canvas;
 
@@ -239,8 +247,19 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     context.strokeStyle = "black";
     context.lineWidth = 1;
 
+    // Improve resolution
+    context.miterLimit = 2;
+    context.setTransform(
+      (this._tileWidth * scaleFactor) / CESIUM_CANVAS_SIZE,
+      0,
+      0,
+      (this._tileHeight * scaleFactor) / CESIUM_CANVAS_SIZE,
+      0,
+      0,
+    );
+
     // Vector tile works with extent [0, 4095], but canvas is only [0,255]
-    const extentFactor = canvas.width / layer.extent;
+    const extentFactor = CESIUM_CANVAS_SIZE / layer.extent;
 
     for (let i = 0; i < layer.length; i++) {
       const feature = layer.feature(i);

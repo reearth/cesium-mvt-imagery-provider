@@ -1,5 +1,5 @@
 import Point from "@mapbox/point-geometry";
-import { VectorTile, VectorTileFeature } from "@mapbox/vector-tile";
+import { VectorTile, VectorTileFeature, VectorTileLayer } from "@mapbox/vector-tile";
 import {
   ImageryProvider,
   ImageryTypes,
@@ -67,7 +67,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _minimumLevel: number;
   private readonly _maximumLevel: number;
   private readonly _urlTemplate: URLTemplate;
-  private readonly _layerName: string;
+  private readonly _layerNames: string[];
   private readonly _credit?: string;
   private readonly _resolution?: number;
   private _currentUrl?: string;
@@ -91,7 +91,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._minimumLevel = options.minimumLevel ?? 0;
     this._maximumLevel = options.maximumLevel ?? Infinity;
     this._urlTemplate = options.urlTemplate;
-    this._layerName = options.layerName;
+    this._layerNames = options.layerName.split(/, */).filter(Boolean);
     this._credit = options.credit;
     this._resolution = options.resolution ?? 5;
     this._onFeaturesRendered = options.onFeaturesRendered;
@@ -211,9 +211,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     this._currentUrl = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
 
-    const layerNames = this._layerName.split(/, */).filter(Boolean);
     return Promise.all(
-      layerNames.map(n => this._renderCanvas(canvas, requestedTile, n, scaleFactor)),
+      this._layerNames.map(n => this._renderCanvas(canvas, requestedTile, n, scaleFactor)),
     ).then(() => canvas);
   }
 
@@ -225,15 +224,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   ): Promise<HTMLCanvasElement> {
     if (!this._currentUrl) return canvas;
 
-    const currentUrl = this._currentUrl;
-    const tile = await (async () => {
-      if (!currentUrl) return;
-      const cachedTile = this._tileCaches.get(currentUrl);
-      if (cachedTile) return cachedTile;
-      const tile = tileToCacheable(await this._parseTile(currentUrl));
-      if (tile) this._tileCaches.set(currentUrl, tile);
-      return tile;
-    })();
+    const tile = await this._cachedTile(this._currentUrl);
 
     const layerNames = layerName.split(/, */).filter(Boolean);
     const layers = layerNames.map(ln => tile?.layers[ln]);
@@ -335,21 +326,33 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
 
-    const data = await fetchResourceAsArrayBuffer(url);
-    if (!data) {
-      return [];
+    const tile = await this._cachedTile(url);
+
+    for (const name of this._layerNames) {
+      const layer = tile?.layers[name];
+      if (!layer) {
+        return []; // return empty list of features for empty tile
+      }
+      const f = await this._pickFeatures(requestedTile, longitude, latitude, layer);
+      if (f) {
+        return f;
+      }
     }
 
-    const layerData = parseMVT(data).layers;
-    const layers = this._layerName
-      .split(/, */)
-      .filter(Boolean)
-      .map(layerName => layerData[layerName]);
-    if (!layers) {
-      return []; // return empty list of features for empty tile
-    }
+    return [];
+  }
 
-    const boundRect = this._tilingScheme.tileXYToNativeRectangle(x, y, level);
+  async _pickFeatures(
+    requestedTile: TileCoordinates,
+    longitude: number,
+    latitude: number,
+    layer: VectorTileLayer,
+  ): Promise<ImageryLayerFeatureInfo[]> {
+    const boundRect = this._tilingScheme.tileXYToNativeRectangle(
+      requestedTile.x,
+      requestedTile.y,
+      requestedTile.level,
+    );
     const x_range = [boundRect.west, boundRect.east];
     const y_range = [boundRect.north, boundRect.south];
 
@@ -376,36 +379,43 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     const features: ImageryLayerFeatureInfo[] = [];
 
-    layers.forEach(layer => {
-      const vt_range = [0, layer.extent - 1];
-      const pos = map(
-        Cartesian2.fromCartesian3(
-          this._tilingScheme.projection.project(new Cartographic(longitude, latitude)),
-        ),
-        x_range,
-        y_range,
-        vt_range,
-        vt_range,
-      );
-      const point = new Point(pos.x, pos.y);
+    const vt_range = [0, layer.extent - 1];
+    const pos = map(
+      Cartesian2.fromCartesian3(
+        this._tilingScheme.projection.project(new Cartographic(longitude, latitude)),
+      ),
+      x_range,
+      y_range,
+      vt_range,
+      vt_range,
+    );
+    const point = new Point(pos.x, pos.y);
 
-      for (let i = 0; i < layer.length; i++) {
-        const feature = layer.feature(i);
-        if (
-          VectorTileFeature.types[feature.type] === "Polygon" &&
-          isFeatureClicked(feature.loadGeometry(), point)
-        ) {
-          if (this._onSelectFeature) {
-            const feat = this._onSelectFeature(feature, requestedTile);
-            if (feat) {
-              features.push(feat);
-            }
+    for (let i = 0; i < layer.length; i++) {
+      const feature = layer.feature(i);
+      if (
+        VectorTileFeature.types[feature.type] === "Polygon" &&
+        isFeatureClicked(feature.loadGeometry(), point)
+      ) {
+        if (this._onSelectFeature) {
+          const feat = this._onSelectFeature(feature, requestedTile);
+          if (feat) {
+            features.push(feat);
           }
         }
       }
-    });
+    }
 
     return features;
+  }
+
+  async _cachedTile(currentUrl: string) {
+    if (!currentUrl) return;
+    const cachedTile = this._tileCaches.get(currentUrl);
+    if (cachedTile) return cachedTile;
+    const tile = tileToCacheable(await this._parseTile(currentUrl));
+    if (tile) this._tileCaches.set(currentUrl, tile);
+    return tile;
   }
 }
 

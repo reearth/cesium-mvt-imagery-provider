@@ -235,8 +235,10 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       return tile;
     })();
 
-    const layer = tile?.layers[layerName];
-    if (!layer) {
+    const layerNames = layerName.split(/, */).filter(Boolean);
+    const layers = layerNames.map(ln => tile?.layers[ln]);
+
+    if (!layers) {
       return canvas;
     }
 
@@ -258,57 +260,60 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       0,
     );
 
-    // Vector tile works with extent [0, 4095], but canvas is only [0,255]
-    const extentFactor = CESIUM_CANVAS_SIZE / layer.extent;
+    layers.forEach(layer => {
+      if (!layer) return;
+      // Vector tile works with extent [0, 4095], but canvas is only [0,255]
+      const extentFactor = CESIUM_CANVAS_SIZE / layer.extent;
 
-    for (let i = 0; i < layer.length; i++) {
-      const feature = layer.feature(i);
+      for (let i = 0; i < layer.length; i++) {
+        const feature = layer.feature(i);
 
-      // Early return.
-      if (this._onRenderFeature && !this._onRenderFeature(feature, requestedTile)) {
-        continue;
-      }
-
-      if (VectorTileFeature.types[feature.type] === "Polygon") {
-        const style = this._style?.(feature, requestedTile);
-        if (!style) {
+        // Early return.
+        if (this._onRenderFeature && !this._onRenderFeature(feature, requestedTile)) {
           continue;
         }
-        context.fillStyle = style.fillStyle ?? context.fillStyle;
-        context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
-        context.lineWidth = style.lineWidth ?? context.lineWidth;
-        context.lineJoin = style.lineJoin ?? context.lineJoin;
 
-        context.beginPath();
-
-        const coordinates = feature.loadGeometry();
-
-        // Polygon rings
-        for (let i2 = 0; i2 < coordinates.length; i2++) {
-          let pos = coordinates[i2][0];
-          context.moveTo(pos.x * extentFactor, pos.y * extentFactor);
-
-          // Polygon ring points
-          for (let j = 1; j < coordinates[i2].length; j++) {
-            pos = coordinates[i2][j];
-            context.lineTo(pos.x * extentFactor, pos.y * extentFactor);
+        if (VectorTileFeature.types[feature.type] === "Polygon") {
+          const style = this._style?.(feature, requestedTile);
+          if (!style) {
+            continue;
           }
-        }
+          context.fillStyle = style.fillStyle ?? context.fillStyle;
+          context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
+          context.lineWidth = style.lineWidth ?? context.lineWidth;
+          context.lineJoin = style.lineJoin ?? context.lineJoin;
 
-        if ((style.lineWidth ?? 1) > 0) {
-          context.stroke();
+          context.beginPath();
+
+          const coordinates = feature.loadGeometry();
+
+          // Polygon rings
+          for (let i2 = 0; i2 < coordinates.length; i2++) {
+            let pos = coordinates[i2][0];
+            context.moveTo(pos.x * extentFactor, pos.y * extentFactor);
+
+            // Polygon ring points
+            for (let j = 1; j < coordinates[i2].length; j++) {
+              pos = coordinates[i2][j];
+              context.lineTo(pos.x * extentFactor, pos.y * extentFactor);
+            }
+          }
+
+          if ((style.lineWidth ?? 1) > 0) {
+            context.stroke();
+          }
+          context.fill();
+        } else {
+          console.log(
+            `Unexpected geometry type: ${feature.type} in region map on tile ${[
+              requestedTile.level,
+              requestedTile.x,
+              requestedTile.y,
+            ].join("/")}`,
+          );
         }
-        context.fill();
-      } else {
-        console.log(
-          `Unexpected geometry type: ${feature.type} in region map on tile ${[
-            requestedTile.level,
-            requestedTile.x,
-            requestedTile.y,
-          ].join("/")}`,
-        );
       }
-    }
+    });
 
     this._onFeaturesRendered?.();
 
@@ -335,8 +340,12 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       return [];
     }
 
-    const layer = parseMVT(data).layers[this._layerName];
-    if (!layer) {
+    const layerData = parseMVT(data).layers;
+    const layers = this._layerName
+      .split(/, */)
+      .filter(Boolean)
+      .map(layerName => layerData[layerName]);
+    if (!layers) {
       return []; // return empty list of features for empty tile
     }
 
@@ -365,33 +374,36 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       );
     };
 
-    const vt_range = [0, layer.extent - 1];
-    const pos = map(
-      Cartesian2.fromCartesian3(
-        this._tilingScheme.projection.project(new Cartographic(longitude, latitude)),
-      ),
-      x_range,
-      y_range,
-      vt_range,
-      vt_range,
-    );
-    const point = new Point(pos.x, pos.y);
+    const features: ImageryLayerFeatureInfo[] = [];
 
-    const features = [];
-    for (let i = 0; i < layer.length; i++) {
-      const feature = layer.feature(i);
-      if (
-        VectorTileFeature.types[feature.type] === "Polygon" &&
-        isFeatureClicked(feature.loadGeometry(), point)
-      ) {
-        if (this._onSelectFeature) {
-          const feat = this._onSelectFeature(feature, requestedTile);
-          if (feat) {
-            features.push(feat);
+    layers.forEach(layer => {
+      const vt_range = [0, layer.extent - 1];
+      const pos = map(
+        Cartesian2.fromCartesian3(
+          this._tilingScheme.projection.project(new Cartographic(longitude, latitude)),
+        ),
+        x_range,
+        y_range,
+        vt_range,
+        vt_range,
+      );
+      const point = new Point(pos.x, pos.y);
+
+      for (let i = 0; i < layer.length; i++) {
+        const feature = layer.feature(i);
+        if (
+          VectorTileFeature.types[feature.type] === "Polygon" &&
+          isFeatureClicked(feature.loadGeometry(), point)
+        ) {
+          if (this._onSelectFeature) {
+            const feat = this._onSelectFeature(feature, requestedTile);
+            if (feat) {
+              features.push(feat);
+            }
           }
         }
       }
-    }
+    });
 
     return features;
   }

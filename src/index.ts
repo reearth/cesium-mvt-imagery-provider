@@ -328,18 +328,21 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     const tile = await this._cachedTile(url);
 
-    for (const name of this._layerNames) {
-      const layer = tile?.layers[name];
-      if (!layer) {
-        return []; // return empty list of features for empty tile
-      }
-      const f = await this._pickFeatures(requestedTile, longitude, latitude, layer);
-      if (f) {
-        return f;
-      }
-    }
+    const ps = await Promise.all(
+      this._layerNames.map(async name => {
+        const layer = tile?.layers[name];
+        if (!layer) {
+          return []; // return empty list of features for empty tile
+        }
+        const f = await this._pickFeatures(requestedTile, longitude, latitude, layer);
+        if (f) {
+          return f;
+        }
+        return [];
+      }),
+    );
 
-    return [];
+    return ps.flat();
   }
 
   async _pickFeatures(

@@ -1,5 +1,5 @@
 import Point from "@mapbox/point-geometry";
-import { VectorTile, VectorTileFeature } from "@mapbox/vector-tile";
+import { VectorTile, VectorTileFeature, VectorTileLayer } from "@mapbox/vector-tile";
 import {
   ImageryProvider,
   ImageryTypes,
@@ -67,7 +67,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _minimumLevel: number;
   private readonly _maximumLevel: number;
   private readonly _urlTemplate: URLTemplate;
-  private readonly _layerName: string;
+  private readonly _layerNames: string[];
   private readonly _credit?: string;
   private readonly _resolution?: number;
   private _currentUrl?: string;
@@ -91,7 +91,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._minimumLevel = options.minimumLevel ?? 0;
     this._maximumLevel = options.maximumLevel ?? Infinity;
     this._urlTemplate = options.urlTemplate;
-    this._layerName = options.layerName;
+    this._layerNames = options.layerName.split(/, */).filter(Boolean);
     this._credit = options.credit;
     this._resolution = options.resolution ?? 5;
     this._onFeaturesRendered = options.onFeaturesRendered;
@@ -211,9 +211,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     this._currentUrl = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
 
-    const layerNames = this._layerName.split(/, */).filter(Boolean);
     return Promise.all(
-      layerNames.map(n => this._renderCanvas(canvas, requestedTile, n, scaleFactor)),
+      this._layerNames.map(n => this._renderCanvas(canvas, requestedTile, n, scaleFactor)),
     ).then(() => canvas);
   }
 
@@ -225,18 +224,12 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   ): Promise<HTMLCanvasElement> {
     if (!this._currentUrl) return canvas;
 
-    const currentUrl = this._currentUrl;
-    const tile = await (async () => {
-      if (!currentUrl) return;
-      const cachedTile = this._tileCaches.get(currentUrl);
-      if (cachedTile) return cachedTile;
-      const tile = tileToCacheable(await this._parseTile(currentUrl));
-      if (tile) this._tileCaches.set(currentUrl, tile);
-      return tile;
-    })();
+    const tile = await this._cachedTile(this._currentUrl);
 
-    const layer = tile?.layers[layerName];
-    if (!layer) {
+    const layerNames = layerName.split(/, */).filter(Boolean);
+    const layers = layerNames.map(ln => tile?.layers[ln]);
+
+    if (!layers) {
       return canvas;
     }
 
@@ -258,57 +251,60 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       0,
     );
 
-    // Vector tile works with extent [0, 4095], but canvas is only [0,255]
-    const extentFactor = CESIUM_CANVAS_SIZE / layer.extent;
+    layers.forEach(layer => {
+      if (!layer) return;
+      // Vector tile works with extent [0, 4095], but canvas is only [0,255]
+      const extentFactor = CESIUM_CANVAS_SIZE / layer.extent;
 
-    for (let i = 0; i < layer.length; i++) {
-      const feature = layer.feature(i);
+      for (let i = 0; i < layer.length; i++) {
+        const feature = layer.feature(i);
 
-      // Early return.
-      if (this._onRenderFeature && !this._onRenderFeature(feature, requestedTile)) {
-        continue;
-      }
-
-      if (VectorTileFeature.types[feature.type] === "Polygon") {
-        const style = this._style?.(feature, requestedTile);
-        if (!style) {
+        // Early return.
+        if (this._onRenderFeature && !this._onRenderFeature(feature, requestedTile)) {
           continue;
         }
-        context.fillStyle = style.fillStyle ?? context.fillStyle;
-        context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
-        context.lineWidth = style.lineWidth ?? context.lineWidth;
-        context.lineJoin = style.lineJoin ?? context.lineJoin;
 
-        context.beginPath();
-
-        const coordinates = feature.loadGeometry();
-
-        // Polygon rings
-        for (let i2 = 0; i2 < coordinates.length; i2++) {
-          let pos = coordinates[i2][0];
-          context.moveTo(pos.x * extentFactor, pos.y * extentFactor);
-
-          // Polygon ring points
-          for (let j = 1; j < coordinates[i2].length; j++) {
-            pos = coordinates[i2][j];
-            context.lineTo(pos.x * extentFactor, pos.y * extentFactor);
+        if (VectorTileFeature.types[feature.type] === "Polygon") {
+          const style = this._style?.(feature, requestedTile);
+          if (!style) {
+            continue;
           }
-        }
+          context.fillStyle = style.fillStyle ?? context.fillStyle;
+          context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
+          context.lineWidth = style.lineWidth ?? context.lineWidth;
+          context.lineJoin = style.lineJoin ?? context.lineJoin;
 
-        if ((style.lineWidth ?? 1) > 0) {
-          context.stroke();
+          context.beginPath();
+
+          const coordinates = feature.loadGeometry();
+
+          // Polygon rings
+          for (let i2 = 0; i2 < coordinates.length; i2++) {
+            let pos = coordinates[i2][0];
+            context.moveTo(pos.x * extentFactor, pos.y * extentFactor);
+
+            // Polygon ring points
+            for (let j = 1; j < coordinates[i2].length; j++) {
+              pos = coordinates[i2][j];
+              context.lineTo(pos.x * extentFactor, pos.y * extentFactor);
+            }
+          }
+
+          if ((style.lineWidth ?? 1) > 0) {
+            context.stroke();
+          }
+          context.fill();
+        } else {
+          console.log(
+            `Unexpected geometry type: ${feature.type} in region map on tile ${[
+              requestedTile.level,
+              requestedTile.x,
+              requestedTile.y,
+            ].join("/")}`,
+          );
         }
-        context.fill();
-      } else {
-        console.log(
-          `Unexpected geometry type: ${feature.type} in region map on tile ${[
-            requestedTile.level,
-            requestedTile.x,
-            requestedTile.y,
-          ].join("/")}`,
-        );
       }
-    }
+    });
 
     this._onFeaturesRendered?.();
 
@@ -330,17 +326,36 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
 
-    const data = await fetchResourceAsArrayBuffer(url);
-    if (!data) {
-      return [];
-    }
+    const tile = await this._cachedTile(url);
 
-    const layer = parseMVT(data).layers[this._layerName];
-    if (!layer) {
-      return []; // return empty list of features for empty tile
-    }
+    const ps = await Promise.all(
+      this._layerNames.map(async name => {
+        const layer = tile?.layers[name];
+        if (!layer) {
+          return []; // return empty list of features for empty tile
+        }
+        const f = await this._pickFeatures(requestedTile, longitude, latitude, layer);
+        if (f) {
+          return f;
+        }
+        return [];
+      }),
+    );
 
-    const boundRect = this._tilingScheme.tileXYToNativeRectangle(x, y, level);
+    return ps.flat();
+  }
+
+  async _pickFeatures(
+    requestedTile: TileCoordinates,
+    longitude: number,
+    latitude: number,
+    layer: VectorTileLayer,
+  ): Promise<ImageryLayerFeatureInfo[]> {
+    const boundRect = this._tilingScheme.tileXYToNativeRectangle(
+      requestedTile.x,
+      requestedTile.y,
+      requestedTile.level,
+    );
     const x_range = [boundRect.west, boundRect.east];
     const y_range = [boundRect.north, boundRect.south];
 
@@ -365,6 +380,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       );
     };
 
+    const features: ImageryLayerFeatureInfo[] = [];
+
     const vt_range = [0, layer.extent - 1];
     const pos = map(
       Cartesian2.fromCartesian3(
@@ -377,7 +394,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     );
     const point = new Point(pos.x, pos.y);
 
-    const features = [];
     for (let i = 0; i < layer.length; i++) {
       const feature = layer.feature(i);
       if (
@@ -394,6 +410,15 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     }
 
     return features;
+  }
+
+  async _cachedTile(currentUrl: string) {
+    if (!currentUrl) return;
+    const cachedTile = this._tileCaches.get(currentUrl);
+    if (cachedTile) return cachedTile;
+    const tile = tileToCacheable(await this._parseTile(currentUrl));
+    if (tile) this._tileCaches.set(currentUrl, tile);
+    return tile;
   }
 }
 

@@ -274,7 +274,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
         context.lineJoin = style.lineJoin ?? context.lineJoin;
 
         if (VectorTileFeature.types[feature.type] === "Polygon") {
-          this._renderPolygon(context, feature, extentFactor);
+          this._renderPolygon(context, feature, extentFactor, (style.lineWidth ?? 1) > 0);
         } else if (VectorTileFeature.types[feature.type] === "Point") {
           this._renderPoint(context, feature, extentFactor);
         } else if (VectorTileFeature.types[feature.type] === "LineString") {
@@ -288,6 +288,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
             ].join("/")}`,
           );
         }
+      }
     });
 
     this._onFeaturesRendered?.();
@@ -299,6 +300,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     context: CanvasRenderingContext2D,
     feature: VectorTileFeature,
     extentFactor: number,
+    shouldRenderLine: boolean,
   ) {
     context.beginPath();
 
@@ -316,7 +318,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       }
     }
 
-    if ((style.lineWidth ?? 1) > 0) {
+    if (shouldRenderLine) {
       context.stroke();
     }
     context.fill();

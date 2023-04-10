@@ -1,5 +1,5 @@
 import Point from "@mapbox/point-geometry";
-import { VectorTile, VectorTileFeature } from "@mapbox/vector-tile";
+import { VectorTile, VectorTileFeature, VectorTileLayer } from "@mapbox/vector-tile";
 import {
   ImageryProvider,
   ImageryTypes,
@@ -39,7 +39,7 @@ type Style = {
   lineJoin?: CanvasLineJoin;
 };
 
-type URLTemplate = `http${"s" | ""}://${string}/{z}/{x}/{y}${string}`;
+type URLTemplate = `${`http${"s" | ""}://` | ""}${string}/{z}/{x}/{y}${string}`;
 
 type FeatureHandler<R> = (feature: VectorTileFeature, tileCoords: TileCoordinates) => R;
 
@@ -50,6 +50,7 @@ export type ImageryProviderOption = {
   maximumLevel?: number;
   maximumNativeZoom?: number;
   credit?: string;
+  resolution?: number;
   onRenderFeature?: FeatureHandler<boolean | void>;
   onFeaturesRendered?: () => void;
   style?: FeatureHandler<Style>;
@@ -59,13 +60,16 @@ export type ImageryProviderOption = {
 
 type ImageryProviderTrait = ImageryProvider;
 
+const CESIUM_CANVAS_SIZE = 256;
+
 export class MVTImageryProvider implements ImageryProviderTrait {
   // Options
   private readonly _minimumLevel: number;
   private readonly _maximumLevel: number;
   private readonly _urlTemplate: URLTemplate;
-  private readonly _layerName: string;
+  private readonly _layerNames: string[];
   private readonly _credit?: string;
+  private readonly _resolution?: number;
   private _currentUrl?: string;
   private _onRenderFeature?: FeatureHandler<boolean | void>;
   private _onFeaturesRendered?: () => void;
@@ -79,14 +83,17 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _tileHeight: number;
   private readonly _rectangle: Rectangle;
   private readonly _ready: boolean;
+  private readonly _readyPromise: Promise<boolean>;
   private readonly _errorEvent = new CesiumEvent();
+  private readonly _tileCaches = new Map<string, VectorTile>();
 
   constructor(options: ImageryProviderOption) {
     this._minimumLevel = options.minimumLevel ?? 0;
     this._maximumLevel = options.maximumLevel ?? Infinity;
     this._urlTemplate = options.urlTemplate;
-    this._layerName = options.layerName;
+    this._layerNames = options.layerName.split(/, */).filter(Boolean);
     this._credit = options.credit;
+    this._resolution = options.resolution ?? 5;
     this._onFeaturesRendered = options.onFeaturesRendered;
     this._onRenderFeature = options.onRenderFeature;
     this._style = options.style;
@@ -96,11 +103,12 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._tilingScheme = new WebMercatorTilingScheme();
 
     // Maybe these pixels are same with Cesium's tile size.
-    this._tileWidth = 256;
-    this._tileHeight = 256;
+    this._tileWidth = CESIUM_CANVAS_SIZE;
+    this._tileHeight = CESIUM_CANVAS_SIZE;
 
     this._rectangle = this._tilingScheme.rectangle;
     this._ready = true;
+    this._readyPromise = Promise.resolve(true);
   }
 
   get url() {
@@ -171,7 +179,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     return <any>undefined;
   }
   get readyPromise() {
-    return <any>undefined;
+    return this._readyPromise;
   }
   get tileDiscardPolicy() {
     return <any>undefined;
@@ -190,8 +198,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     _request?: Request | undefined,
   ): Promise<ImageryTypes> | undefined {
     const canvas = document.createElement("canvas");
-    canvas.width = this._tileWidth;
-    canvas.height = this._tileHeight;
 
     const requestedTile: TileCoordinates = {
       x,
@@ -199,19 +205,31 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       level,
     };
 
+    const scaleFactor = (level >= this.maximumLevel ? this._resolution : undefined) ?? 1;
+    canvas.width = this._tileWidth * scaleFactor;
+    canvas.height = this._tileHeight * scaleFactor;
+
     this._currentUrl = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
 
-    return this._renderCanvas(canvas, requestedTile);
+    return Promise.all(
+      this._layerNames.map(n => this._renderCanvas(canvas, requestedTile, n, scaleFactor)),
+    ).then(() => canvas);
   }
 
   async _renderCanvas(
     canvas: HTMLCanvasElement,
     requestedTile: TileCoordinates,
+    layerName: string,
+    scaleFactor: number,
   ): Promise<HTMLCanvasElement> {
-    const tile = await this._parseTile(this._currentUrl);
+    if (!this._currentUrl) return canvas;
 
-    const layer = tile?.layers[this._layerName];
-    if (!layer) {
+    const tile = await this._cachedTile(this._currentUrl);
+
+    const layerNames = layerName.split(/, */).filter(Boolean);
+    const layers = layerNames.map(ln => tile?.layers[ln]);
+
+    if (!layers) {
       return canvas;
     }
 
@@ -222,41 +240,55 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     context.strokeStyle = "black";
     context.lineWidth = 1;
 
-    // Vector tile works with extent [0, 4095], but canvas is only [0,255]
-    const extentFactor = canvas.width / layer.extent;
+    // Improve resolution
+    context.miterLimit = 2;
+    context.setTransform(
+      (this._tileWidth * scaleFactor) / CESIUM_CANVAS_SIZE,
+      0,
+      0,
+      (this._tileHeight * scaleFactor) / CESIUM_CANVAS_SIZE,
+      0,
+      0,
+    );
 
-    for (let i = 0; i < layer.length; i++) {
-      const feature = layer.feature(i);
+    layers.forEach(layer => {
+      if (!layer) return;
+      // Vector tile works with extent [0, 4095], but canvas is only [0,255]
+      const extentFactor = CESIUM_CANVAS_SIZE / layer.extent;
 
-      // Early return.
-      if (this._onRenderFeature && !this._onRenderFeature(feature, requestedTile)) {
-        continue;
-      }
+      for (let i = 0; i < layer.length; i++) {
+        const feature = layer.feature(i);
 
-      const style = this._style?.(feature, requestedTile);
-      if (style) {
+        // Early return.
+        if (this._onRenderFeature && !this._onRenderFeature(feature, requestedTile)) {
+          continue;
+        }
+
+        const style = this._style?.(feature, requestedTile);
+        if (!style) {
+          continue;
+        }
         context.fillStyle = style.fillStyle ?? context.fillStyle;
         context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
         context.lineWidth = style.lineWidth ?? context.lineWidth;
         context.lineJoin = style.lineJoin ?? context.lineJoin;
-      }
 
-      if (VectorTileFeature.types[feature.type] === "Polygon") {
-        this._renderPolygon(context, feature, extentFactor);
-      } else if (VectorTileFeature.types[feature.type] === "Point") {
-        this._renderPoint(context, feature, extentFactor);
-      } else if (VectorTileFeature.types[feature.type] === "LineString") {
-        this._renderLineString(context, feature, extentFactor);
-      } else {
-        console.error(
-          `Unexpected geometry type: ${feature.type} in region map on tile ${[
-            requestedTile.level,
-            requestedTile.x,
-            requestedTile.y,
-          ].join("/")}`,
-        );
-      }
-    }
+        if (VectorTileFeature.types[feature.type] === "Polygon") {
+          this._renderPolygon(context, feature, extentFactor);
+        } else if (VectorTileFeature.types[feature.type] === "Point") {
+          this._renderPoint(context, feature, extentFactor);
+        } else if (VectorTileFeature.types[feature.type] === "LineString") {
+          this._renderLineString(context, feature, extentFactor);
+        } else {
+          console.error(
+            `Unexpected geometry type: ${feature.type} in region map on tile ${[
+              requestedTile.level,
+              requestedTile.x,
+              requestedTile.y,
+            ].join("/")}`,
+          );
+        }
+    });
 
     this._onFeaturesRendered?.();
 
@@ -283,7 +315,10 @@ export class MVTImageryProvider implements ImageryProviderTrait {
         context.lineTo(pos.x * extentFactor, pos.y * extentFactor);
       }
     }
-    context.stroke();
+
+    if ((style.lineWidth ?? 1) > 0) {
+      context.stroke();
+    }
     context.fill();
   }
 
@@ -345,14 +380,36 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
 
-    const data = await fetchResourceAsArrayBuffer(url);
+    const tile = await this._cachedTile(url);
 
-    const layer = parseMVT(data).layers[this._layerName];
-    if (!layer) {
-      return []; // return empty list of features for empty tile
-    }
+    const ps = await Promise.all(
+      this._layerNames.map(async name => {
+        const layer = tile?.layers[name];
+        if (!layer) {
+          return []; // return empty list of features for empty tile
+        }
+        const f = await this._pickFeatures(requestedTile, longitude, latitude, layer);
+        if (f) {
+          return f;
+        }
+        return [];
+      }),
+    );
 
-    const boundRect = this._tilingScheme.tileXYToNativeRectangle(x, y, level);
+    return ps.flat();
+  }
+
+  async _pickFeatures(
+    requestedTile: TileCoordinates,
+    longitude: number,
+    latitude: number,
+    layer: VectorTileLayer,
+  ): Promise<ImageryLayerFeatureInfo[]> {
+    const boundRect = this._tilingScheme.tileXYToNativeRectangle(
+      requestedTile.x,
+      requestedTile.y,
+      requestedTile.level,
+    );
     const x_range = [boundRect.west, boundRect.east];
     const y_range = [boundRect.north, boundRect.south];
 
@@ -377,6 +434,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       );
     };
 
+    const features: ImageryLayerFeatureInfo[] = [];
+
     const vt_range = [0, layer.extent - 1];
     const pos = map(
       Cartesian2.fromCartesian3(
@@ -389,7 +448,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     );
     const point = new Point(pos.x, pos.y);
 
-    const features = [];
     for (let i = 0; i < layer.length; i++) {
       const feature = layer.feature(i);
       if (
@@ -407,10 +465,20 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     return features;
   }
+
+  async _cachedTile(currentUrl: string) {
+    if (!currentUrl) return;
+    const cachedTile = this._tileCaches.get(currentUrl);
+    if (cachedTile) return cachedTile;
+    const tile = tileToCacheable(await this._parseTile(currentUrl));
+    if (tile) this._tileCaches.set(currentUrl, tile);
+    return tile;
+  }
 }
 
 const buildURLWithTileCoordinates = (template: URLTemplate, tile: TileCoordinates) => {
-  const z = template.replace("{z}", String(tile.level));
+  const decodedTemplate = decodeURIComponent(template);
+  const z = decodedTemplate.replace("{z}", String(tile.level));
   const x = z.replace("{x}", String(tile.x));
   const y = x.replace("{y}", String(tile.y));
   return y;
@@ -420,10 +488,37 @@ const parseMVT = (ab?: ArrayBuffer) => {
   return new VectorTile(new Pbf(ab));
 };
 
+const tileToCacheable = (v: VectorTile | undefined) => {
+  if (!v) return;
+  const layers: VectorTile["layers"] = {};
+  for (const [key, value] of Object.entries(v.layers)) {
+    const features: VectorTileFeature[] = [];
+    const layer = value;
+    for (let i = 0; i < layer.length; i++) {
+      const feature = layer.feature(i);
+      const geo = feature.loadGeometry();
+      const bbox = feature.bbox?.();
+      const f: VectorTileFeature = {
+        ...feature,
+        id: feature.id,
+        loadGeometry: () => geo,
+        bbox: bbox ? () => bbox : undefined,
+        toGeoJSON: feature.toGeoJSON,
+      };
+      features.push(f);
+    }
+    layers[key] = {
+      ...layer,
+      feature: i => features[i],
+    };
+  }
+  return { layers };
+};
+
 const fetchResourceAsArrayBuffer = (url?: string) => {
   if (!url) {
     throw new Error("fetch request is failed because request url is undefined");
   }
 
-  return Resource.fetchArrayBuffer({ url });
+  return Resource.fetchArrayBuffer({ url })?.catch(() => {});
 };

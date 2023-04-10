@@ -264,38 +264,23 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           continue;
         }
 
+        const style = this._style?.(feature, requestedTile);
+        if (!style) {
+          continue;
+        }
+        context.fillStyle = style.fillStyle ?? context.fillStyle;
+        context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
+        context.lineWidth = style.lineWidth ?? context.lineWidth;
+        context.lineJoin = style.lineJoin ?? context.lineJoin;
+
         if (VectorTileFeature.types[feature.type] === "Polygon") {
-          const style = this._style?.(feature, requestedTile);
-          if (!style) {
-            continue;
-          }
-          context.fillStyle = style.fillStyle ?? context.fillStyle;
-          context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
-          context.lineWidth = style.lineWidth ?? context.lineWidth;
-          context.lineJoin = style.lineJoin ?? context.lineJoin;
-
-          context.beginPath();
-
-          const coordinates = feature.loadGeometry();
-
-          // Polygon rings
-          for (let i2 = 0; i2 < coordinates.length; i2++) {
-            let pos = coordinates[i2][0];
-            context.moveTo(pos.x * extentFactor, pos.y * extentFactor);
-
-            // Polygon ring points
-            for (let j = 1; j < coordinates[i2].length; j++) {
-              pos = coordinates[i2][j];
-              context.lineTo(pos.x * extentFactor, pos.y * extentFactor);
-            }
-          }
-
-          if ((style.lineWidth ?? 1) > 0) {
-            context.stroke();
-          }
-          context.fill();
+          this._renderPolygon(context, feature, extentFactor, (style.lineWidth ?? 1) > 0);
+        } else if (VectorTileFeature.types[feature.type] === "Point") {
+          this._renderPoint(context, feature, extentFactor);
+        } else if (VectorTileFeature.types[feature.type] === "LineString") {
+          this._renderLineString(context, feature, extentFactor);
         } else {
-          console.log(
+          console.error(
             `Unexpected geometry type: ${feature.type} in region map on tile ${[
               requestedTile.level,
               requestedTile.x,
@@ -309,6 +294,77 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._onFeaturesRendered?.();
 
     return canvas;
+  }
+
+  _renderPolygon(
+    context: CanvasRenderingContext2D,
+    feature: VectorTileFeature,
+    extentFactor: number,
+    shouldRenderLine: boolean,
+  ) {
+    context.beginPath();
+
+    const coordinates = feature.loadGeometry();
+
+    // Polygon rings
+    for (let i2 = 0; i2 < coordinates.length; i2++) {
+      let pos = coordinates[i2][0];
+      context.moveTo(pos.x * extentFactor, pos.y * extentFactor);
+
+      // Polygon ring points
+      for (let j = 1; j < coordinates[i2].length; j++) {
+        pos = coordinates[i2][j];
+        context.lineTo(pos.x * extentFactor, pos.y * extentFactor);
+      }
+    }
+
+    if (shouldRenderLine) {
+      context.stroke();
+    }
+    context.fill();
+  }
+
+  _renderPoint(
+    context: CanvasRenderingContext2D,
+    feature: VectorTileFeature,
+    extentFactor: number,
+  ) {
+    context.beginPath();
+
+    const coordinates = feature.loadGeometry();
+
+    for (let i2 = 0; i2 < coordinates.length; i2++) {
+      const pos = coordinates[i2][0];
+      const [x, y] = [pos.x * extentFactor, pos.y * extentFactor];
+
+      // Handle lineWidth as radius
+      const radius = context.lineWidth;
+
+      context.beginPath();
+      context.arc(x, y, radius, 0, 2 * Math.PI);
+      context.fill();
+    }
+  }
+
+  _renderLineString(
+    context: CanvasRenderingContext2D,
+    feature: VectorTileFeature,
+    extentFactor: number,
+  ) {
+    context.beginPath();
+
+    const coordinates = feature.loadGeometry();
+
+    for (let i2 = 0; i2 < coordinates.length; i2++) {
+      let pos = coordinates[i2][0];
+      context.moveTo(pos.x * extentFactor, pos.y * extentFactor);
+
+      for (let j = 1; j < coordinates[i2].length; j++) {
+        pos = coordinates[i2][j];
+        context.lineTo(pos.x * extentFactor, pos.y * extentFactor);
+      }
+    }
+    context.stroke();
   }
 
   async pickFeatures(

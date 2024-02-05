@@ -26,6 +26,8 @@ const defaultParseTile = async (url?: string) => {
   const tile = parseMVT(ab);
   return tile;
 };
+const defaultPickPointRadius = 5;
+const defaultPickLineWidth = 5;
 
 type TileCoordinates = {
   x: number;
@@ -79,8 +81,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private _style?: FeatureHandler<Style>;
   private _onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   private _parseTile: (url?: string) => Promise<VectorTile | undefined>;
-  private _pickPointRadius: FeatureHandler<number>;
-  private _pickLineWidth: FeatureHandler<number>;
+  private _pickPointRadius?: FeatureHandler<number> | number;
+  private _pickLineWidth?: FeatureHandler<number> | number;
 
   // Internal variables
   private readonly _tilingScheme: WebMercatorTilingScheme;
@@ -104,10 +106,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._style = options.style;
     this._onSelectFeature = options.onSelectFeature;
     this._parseTile = options.parseTile ?? defaultParseTile;
-    this._pickPointRadius =
-      typeof options.pickPointRadius === "function" ? options.pickPointRadius : () => 5;
-    this._pickLineWidth =
-      typeof options.pickLineWidth === "function" ? options.pickLineWidth : () => 5;
+    this._pickPointRadius = options.pickPointRadius ?? 5;
+    this._pickLineWidth = options.pickLineWidth ?? 5;
 
     this._tilingScheme = new WebMercatorTilingScheme();
 
@@ -468,13 +468,23 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           isLineStringClicked(
             feature.loadGeometry(),
             point,
-            this._pickLineWidth(feature, requestedTile),
+            featureHandlerOrNumber(
+              this._pickLineWidth,
+              feature,
+              requestedTile,
+              defaultPickLineWidth,
+            ),
           )) ||
         (VectorTileFeature.types[feature.type] === "Point" &&
           isPointClicked(
             feature.loadGeometry(),
             point,
-            this._pickPointRadius(feature, requestedTile),
+            featureHandlerOrNumber(
+              this._pickPointRadius,
+              feature,
+              requestedTile,
+              defaultPickPointRadius,
+            ),
           ))
       ) {
         if (this._onSelectFeature) {
@@ -545,3 +555,18 @@ const fetchResourceAsArrayBuffer = (url?: string) => {
 
   return Resource.fetchArrayBuffer({ url })?.catch(() => {});
 };
+
+function featureHandlerOrNumber(
+  f: FeatureHandler<number> | number | undefined,
+  feature: VectorTileFeature,
+  tileCoords: TileCoordinates,
+  defaultValue: number,
+): number {
+  if (typeof f === "number") {
+    return f;
+  }
+  if (typeof f === "function") {
+    return f(feature, tileCoords);
+  }
+  return defaultValue;
+}

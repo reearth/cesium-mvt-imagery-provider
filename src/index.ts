@@ -16,6 +16,7 @@ import {
 import Pbf from "pbf";
 
 import { isFeatureClicked } from "./terria";
+import { isLineStringClicked, isPointClicked } from "./util";
 
 const defaultParseTile = async (url?: string) => {
   const ab = await fetchResourceAsArrayBuffer(url);
@@ -25,6 +26,8 @@ const defaultParseTile = async (url?: string) => {
   const tile = parseMVT(ab);
   return tile;
 };
+const defaultPickPointRadius = 5;
+const defaultPickLineWidth = 5;
 
 type TileCoordinates = {
   x: number;
@@ -56,6 +59,8 @@ export type ImageryProviderOption = {
   style?: FeatureHandler<Style>;
   onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   parseTile?: (url?: string) => Promise<VectorTile | undefined>;
+  pickPointRadius?: number | FeatureHandler<number>;
+  pickLineWidth?: number | FeatureHandler<number>;
 };
 
 type ImageryProviderTrait = ImageryProvider;
@@ -76,6 +81,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private _style?: FeatureHandler<Style>;
   private _onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   private _parseTile: (url?: string) => Promise<VectorTile | undefined>;
+  private _pickPointRadius: number | FeatureHandler<number>;
+  private _pickLineWidth: number | FeatureHandler<number>;
 
   // Internal variables
   private readonly _tilingScheme: WebMercatorTilingScheme;
@@ -99,6 +106,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._style = options.style;
     this._onSelectFeature = options.onSelectFeature;
     this._parseTile = options.parseTile ?? defaultParseTile;
+    this._pickPointRadius = options.pickPointRadius ?? defaultPickPointRadius;
+    this._pickLineWidth = options.pickLineWidth ?? defaultPickLineWidth;
 
     this._tilingScheme = new WebMercatorTilingScheme();
 
@@ -435,10 +444,9 @@ export class MVTImageryProvider implements ImageryProviderTrait {
         new Cartesian2(),
       );
     };
-
-    const features: ImageryLayerFeatureInfo[] = [];
-
     const vt_range = [0, layer.extent - 1];
+    const pixelScaleX = (vt_range[1] - vt_range[0]) / this._tileWidth;
+    // const pixelScaleY = (vt_range[1] - vt_range[0]) / this._tileHeight;
     const pos = map(
       Cartesian2.fromCartesian3(
         this._tilingScheme.projection.project(new Cartographic(longitude, latitude)),
@@ -450,11 +458,24 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     );
     const point = new Point(pos.x, pos.y);
 
+    const features: ImageryLayerFeatureInfo[] = [];
     for (let i = 0; i < layer.length; i++) {
       const feature = layer.feature(i);
       if (
-        VectorTileFeature.types[feature.type] === "Polygon" &&
-        isFeatureClicked(feature.loadGeometry(), point)
+        (VectorTileFeature.types[feature.type] === "Polygon" &&
+          isFeatureClicked(feature.loadGeometry(), point)) ||
+        (VectorTileFeature.types[feature.type] === "LineString" &&
+          isLineStringClicked(
+            feature.loadGeometry(),
+            point,
+            featureHandlerOrNumber(this._pickLineWidth, feature, requestedTile) * pixelScaleX,
+          )) ||
+        (VectorTileFeature.types[feature.type] === "Point" &&
+          isPointClicked(
+            feature.loadGeometry(),
+            point,
+            featureHandlerOrNumber(this._pickPointRadius, feature, requestedTile) * pixelScaleX,
+          ))
       ) {
         if (this._onSelectFeature) {
           const feat = this._onSelectFeature(feature, requestedTile);
@@ -524,3 +545,14 @@ const fetchResourceAsArrayBuffer = (url?: string) => {
 
   return Resource.fetchArrayBuffer({ url })?.catch(() => {});
 };
+
+function featureHandlerOrNumber(
+  f: FeatureHandler<number> | number,
+  feature: VectorTileFeature,
+  tileCoords: TileCoordinates,
+): number {
+  if (typeof f === "number") {
+    return f;
+  }
+  return f(feature, tileCoords);
+}

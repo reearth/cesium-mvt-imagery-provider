@@ -444,10 +444,9 @@ export class MVTImageryProvider implements ImageryProviderTrait {
         new Cartesian2(),
       );
     };
-
-    const features: ImageryLayerFeatureInfo[] = [];
-
     const vt_range = [0, layer.extent - 1];
+    const pixelScaleX = (vt_range[1] - vt_range[0]) / this._tileWidth;
+    // const pixelScaleY = (vt_range[1] - vt_range[0]) / this._tileHeight;
     const pos = map(
       Cartesian2.fromCartesian3(
         this._tilingScheme.projection.project(new Cartographic(longitude, latitude)),
@@ -459,6 +458,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     );
     const point = new Point(pos.x, pos.y);
 
+    const features: ImageryLayerFeatureInfo[] = [];
     for (let i = 0; i < layer.length; i++) {
       const feature = layer.feature(i);
       if (
@@ -468,13 +468,13 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           isLineStringClicked(
             feature.loadGeometry(),
             point,
-            featureHandlerOrNumber(this._pickLineWidth, feature, requestedTile),
+            featureHandlerOrNumber(this._pickLineWidth, feature, requestedTile) * pixelScaleX,
           )) ||
         (VectorTileFeature.types[feature.type] === "Point" &&
           isPointClicked(
             feature.loadGeometry(),
             point,
-            featureHandlerOrNumber(this._pickPointRadius, feature, requestedTile),
+            featureHandlerOrNumber(this._pickPointRadius, feature, requestedTile) * pixelScaleX,
           ))
       ) {
         if (this._onSelectFeature) {

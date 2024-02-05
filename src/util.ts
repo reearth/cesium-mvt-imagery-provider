@@ -5,17 +5,19 @@ const tempPoint = new Point(0, 0);
 export function isPointClicked(feature: Point[][], clicked: Point, radius: number): boolean {
   if (feature.length === 0 || feature[0].length === 0) return false;
   const point = feature[0][0];
-  return point.dist(clicked) <= radius;
+  const distSquared = point.distSqr(clicked);
+  return distSquared <= radius ** 2;
 }
 
 export function isLineStringClicked(feature: Point[][], mouse: Point, lineWidth: number): boolean {
   if (feature.length === 0) return false;
   const points = feature[0];
+  const dist = lineWidth / 2;
 
   for (let i = 0; i < points.length - 1; i++) {
     const start = points[i];
     const end = points[i + 1];
-    if (isLineSegmentClicked(start, end, mouse, lineWidth, tempPoint)) {
+    if (isLineSegmentClicked(start, end, mouse, dist, tempPoint)) {
       return true;
     }
   }
@@ -27,7 +29,7 @@ function isLineSegmentClicked(
   start: Point,
   end: Point,
   mouse: Point,
-  lineWidth: number,
+  dist: number,
   tempPoint = new Point(0, 0),
 ): boolean {
   const lineLengthSquared = start.distSqr(end);
@@ -43,5 +45,5 @@ function isLineSegmentClicked(
   nearest.y = start.y + tClamped * (end.y - start.y);
 
   const distanceSquared = mouse.distSqr(nearest);
-  return distanceSquared <= (lineWidth / 2) ** 2;
+  return distanceSquared <= dist ** 2;
 }

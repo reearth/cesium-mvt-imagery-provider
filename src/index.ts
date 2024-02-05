@@ -16,6 +16,7 @@ import {
 import Pbf from "pbf";
 
 import { isFeatureClicked } from "./terria";
+import { isLineStringClicked, isPointClicked } from "./util";
 
 const defaultParseTile = async (url?: string) => {
   const ab = await fetchResourceAsArrayBuffer(url);
@@ -56,6 +57,8 @@ export type ImageryProviderOption = {
   style?: FeatureHandler<Style>;
   onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   parseTile?: (url?: string) => Promise<VectorTile | undefined>;
+  pickPointRadius?: number | FeatureHandler<number>;
+  pickLineWidth?: number | FeatureHandler<number>;
 };
 
 type ImageryProviderTrait = ImageryProvider;
@@ -76,6 +79,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private _style?: FeatureHandler<Style>;
   private _onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   private _parseTile: (url?: string) => Promise<VectorTile | undefined>;
+  private _pickPointRadius: FeatureHandler<number>;
+  private _pickLineWidth: FeatureHandler<number>;
 
   // Internal variables
   private readonly _tilingScheme: WebMercatorTilingScheme;
@@ -99,6 +104,10 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._style = options.style;
     this._onSelectFeature = options.onSelectFeature;
     this._parseTile = options.parseTile ?? defaultParseTile;
+    this._pickPointRadius =
+      typeof options.pickPointRadius === "function" ? options.pickPointRadius : () => 5;
+    this._pickLineWidth =
+      typeof options.pickLineWidth === "function" ? options.pickLineWidth : () => 5;
 
     this._tilingScheme = new WebMercatorTilingScheme();
 
@@ -453,8 +462,20 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     for (let i = 0; i < layer.length; i++) {
       const feature = layer.feature(i);
       if (
-        VectorTileFeature.types[feature.type] === "Polygon" &&
-        isFeatureClicked(feature.loadGeometry(), point)
+        (VectorTileFeature.types[feature.type] === "Polygon" &&
+          isFeatureClicked(feature.loadGeometry(), point)) ||
+        (VectorTileFeature.types[feature.type] === "LineString" &&
+          isLineStringClicked(
+            feature.loadGeometry(),
+            point,
+            this._pickLineWidth(feature, requestedTile),
+          )) ||
+        (VectorTileFeature.types[feature.type] === "Point" &&
+          isPointClicked(
+            feature.loadGeometry(),
+            point,
+            this._pickPointRadius(feature, requestedTile),
+          ))
       ) {
         if (this._onSelectFeature) {
           const feat = this._onSelectFeature(feature, requestedTile);

@@ -5,7 +5,7 @@ const tempPoint = new Point(0, 0);
 export function isPointClicked(feature: Point[][], clicked: Point, radius: number): boolean {
   if (feature.length === 0 || feature[0].length === 0) return false;
   const point = feature[0][0];
-  return point.dist(clicked) < radius;
+  return point.dist(clicked) <= radius;
 }
 
 export function isLineStringClicked(feature: Point[][], mouse: Point, lineWidth: number): boolean {

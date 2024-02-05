@@ -81,8 +81,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private _style?: FeatureHandler<Style>;
   private _onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   private _parseTile: (url?: string) => Promise<VectorTile | undefined>;
-  private _pickPointRadius?: FeatureHandler<number> | number;
-  private _pickLineWidth?: FeatureHandler<number> | number;
+  private _pickPointRadius: number | FeatureHandler<number>;
+  private _pickLineWidth: number | FeatureHandler<number>;
 
   // Internal variables
   private readonly _tilingScheme: WebMercatorTilingScheme;
@@ -106,8 +106,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._style = options.style;
     this._onSelectFeature = options.onSelectFeature;
     this._parseTile = options.parseTile ?? defaultParseTile;
-    this._pickPointRadius = options.pickPointRadius ?? 5;
-    this._pickLineWidth = options.pickLineWidth ?? 5;
+    this._pickPointRadius = options.pickPointRadius ?? defaultPickPointRadius;
+    this._pickLineWidth = options.pickLineWidth ?? defaultPickLineWidth;
 
     this._tilingScheme = new WebMercatorTilingScheme();
 
@@ -468,23 +468,13 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           isLineStringClicked(
             feature.loadGeometry(),
             point,
-            featureHandlerOrNumber(
-              this._pickLineWidth,
-              feature,
-              requestedTile,
-              defaultPickLineWidth,
-            ),
+            featureHandlerOrNumber(this._pickLineWidth, feature, requestedTile),
           )) ||
         (VectorTileFeature.types[feature.type] === "Point" &&
           isPointClicked(
             feature.loadGeometry(),
             point,
-            featureHandlerOrNumber(
-              this._pickPointRadius,
-              feature,
-              requestedTile,
-              defaultPickPointRadius,
-            ),
+            featureHandlerOrNumber(this._pickPointRadius, feature, requestedTile),
           ))
       ) {
         if (this._onSelectFeature) {
@@ -557,16 +547,12 @@ const fetchResourceAsArrayBuffer = (url?: string) => {
 };
 
 function featureHandlerOrNumber(
-  f: FeatureHandler<number> | number | undefined,
+  f: FeatureHandler<number> | number,
   feature: VectorTileFeature,
   tileCoords: TileCoordinates,
-  defaultValue: number,
 ): number {
   if (typeof f === "number") {
     return f;
   }
-  if (typeof f === "function") {
-    return f(feature, tileCoords);
-  }
-  return defaultValue;
+  return f(feature, tileCoords);
 }

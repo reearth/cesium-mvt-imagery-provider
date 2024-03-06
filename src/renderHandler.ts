@@ -1,7 +1,8 @@
 import type { ImageryLayerFeatureInfo } from "cesium";
 
-import type { RendererOption } from "./renderer";
+import { RendererOption } from "./RenderWorker";
 import type { TileCoordinates } from "./types";
+import { Layer } from "./styleEvaluator/types";
 
 export abstract class RenderHandler {
   abstract init(options: RendererOption): Promise<void>;
@@ -9,6 +10,7 @@ export abstract class RenderHandler {
     canvas: HTMLCanvasElement;
     requestedTile: TileCoordinates;
     scaleFactor: number;
+    currentLayer?: Layer;
   }): Promise<void>;
   abstract pick(options: {
     requestedTile: TileCoordinates;

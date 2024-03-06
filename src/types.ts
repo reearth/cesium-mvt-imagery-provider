@@ -1,5 +1,6 @@
 import { VectorTile, VectorTileFeature } from "@mapbox/vector-tile";
 import { ImageryLayerFeatureInfo } from "cesium";
+import { LayerSimple } from "./styleEvaluator/types";
 
 export type Style = {
   fillStyle?: string;
@@ -8,9 +9,14 @@ export type Style = {
   lineJoin?: CanvasLineJoin;
 };
 
-export type URLTemplate = `${`http${"s" | ""}://` | ""}${string}/{z}/{x}/{y}${string}`;
+export type URLTemplate = `${
+  | `http${"s" | ""}://`
+  | ""}${string}/{z}/{x}/{y}${string}`;
 
-export type FeatureHandler<R> = (feature: VectorTileFeature, tileCoords: TileCoordinates) => R;
+export type FeatureHandler<R> = (
+  feature: VectorTileFeature,
+  tileCoords: TileCoordinates
+) => R;
 
 export type TileCoordinates = {
   x: number;
@@ -27,6 +33,7 @@ export type ImageryProviderOption = {
   credit?: string;
   resolution?: number;
   worker?: boolean;
+  layer?: LayerSimple;
   onRenderFeature?: FeatureHandler<boolean | void>;
   onFeaturesRendered?: () => void;
   style?: FeatureHandler<Style>;
@@ -35,3 +42,5 @@ export type ImageryProviderOption = {
 };
 
 export const CESIUM_CANVAS_SIZE = 256;
+
+/// <reference types="offscreencanvas" />

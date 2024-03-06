@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   ImageryProvider,
   ImageryTypes,
@@ -5,19 +6,34 @@ import {
   Request,
   WebMercatorTilingScheme,
   Event as CesiumEvent,
-  ImageryLayerFeatureInfo,
   Credit,
+  ImageryLayerFeatureInfo,
 } from "cesium";
+import { LRUCache } from "lru-cache";
+import { Transfer } from "threads";
+
+import { RendererOption } from "./RenderWorker";
+import {
+  CESIUM_CANVAS_SIZE,
+  ImageryProviderOption,
+  TileCoordinates,
+} from "./types";
+import { canQueue, queue } from "./workerPool";
 
 import { RenderMainHandler } from "./handler";
 import { RenderHandler } from "./renderHandler";
-import { CESIUM_CANVAS_SIZE, ImageryProviderOption, TileCoordinates } from "./types";
-import { RenderWorkerHandler } from "./worker/handler";
-import WorkerBlob from "./worker/receiver?worker&inline";
+import { Layer } from "./styleEvaluator/types";
 
 type ImageryProviderTrait = ImageryProvider;
 
 export class MVTImageryProvider implements ImageryProviderTrait {
+  static maximumTasks = 50;
+  static maximumTasksPerImagery = 6;
+
+  private readonly tileRendererParams: RendererOption;
+  private readonly tileCache: LRUCache<string, HTMLCanvasElement> | undefined;
+  private taskCount = 0;
+
   // Options
   private readonly _minimumLevel: number;
   private readonly _maximumLevel: number;
@@ -30,9 +46,10 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _tileHeight: number;
   private readonly _rectangle: Rectangle;
   private readonly _ready: boolean;
-  private readonly _readyPromise: Promise<boolean>;
+  private readonly _readyPromise: Promise<boolean> = Promise.resolve(true);
   private readonly _errorEvent = new CesiumEvent();
   private readonly _handler: RenderHandler;
+  private readonly _useWorker: boolean;
 
   constructor(options: ImageryProviderOption) {
     this._minimumLevel = options.minimumLevel ?? 0;
@@ -41,6 +58,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     this._resolution = options.resolution ?? 5;
 
     this._tilingScheme = new WebMercatorTilingScheme();
+    this._useWorker = options.worker ?? false;
 
     // Maybe these pixels are same with Cesium's tile size.
     this._tileWidth = CESIUM_CANVAS_SIZE;
@@ -48,9 +66,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     this._rectangle = this._tilingScheme.rectangle;
 
-    this._handler = options.worker
-      ? new RenderWorkerHandler(new WorkerBlob())
-      : new RenderMainHandler();
+    this._handler = new RenderMainHandler();
 
     this._ready = true;
     this._readyPromise = this._handler
@@ -60,6 +76,12 @@ export class MVTImageryProvider implements ImageryProviderTrait {
         tilingScheme: this.tilingScheme,
       })
       .then(() => true);
+    this.tileRendererParams = {
+      ...options,
+      layerNames: options.layerName.split(/, */).filter(Boolean),
+      tilingScheme: this.tilingScheme,
+      currentLayer: options.layer,
+    };
   }
 
   get tileWidth() {
@@ -143,19 +165,55 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     x: number,
     y: number,
     level: number,
-    _request?: Request | undefined,
+    _request?: Request | undefined
   ): Promise<ImageryTypes> | undefined {
+    if (
+      this.taskCount >= MVTImageryProvider.maximumTasksPerImagery||
+      !canQueue(MVTImageryProvider.maximumTasks)
+    ) {
+      return
+    }
+    const cacheKey = `${x}/${y}/${level}`;
+    if (this.tileCache?.has(cacheKey) === true) {
+      const canvas = this.tileCache.get(cacheKey);
+      return Promise.resolve(canvas as ImageryTypes);
+    }
     const canvas = document.createElement("canvas");
-
     const requestedTile: TileCoordinates = {
       x,
       y,
       level,
     };
 
-    const scaleFactor = (level >= this.maximumLevel ? this._resolution : undefined) ?? 1;
+    const scaleFactor =
+      (level >= this.maximumLevel ? this._resolution : undefined) ?? 1;
     canvas.width = this._tileWidth * scaleFactor;
     canvas.height = this._tileHeight * scaleFactor;
+    const offscreen = canvas.transferControlToOffscreen();
+    const currentLayer = this.tileRendererParams.currentLayer;
+
+    ++this.taskCount;
+
+
+    if(this._useWorker) {
+      return this.renderTile(requestedTile, offscreen, scaleFactor, currentLayer)
+      .then(() => {
+        this.tileCache?.set(cacheKey, canvas);
+        return canvas;
+      })
+      .catch((error) => {
+        if (
+          error instanceof Error &&
+          error.message.startsWith("Unimplemented type")
+        ) {
+          return canvas;
+        }
+        throw error;
+      })
+      .finally(() => {
+        --this.taskCount;
+      });
+    }
 
     return this.readyPromise.then(() => {
       return this._handler
@@ -163,10 +221,32 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           canvas,
           requestedTile,
           scaleFactor,
+          currentLayer
         })
         .then(() => {
           return canvas;
         });
+    });
+  }
+
+  async renderTile(
+    coords: TileCoordinates,
+    canvas: OffscreenCanvas,
+    scaleFactor: number,
+    currentLayer?: Layer
+  ): Promise<void> {
+    await queue(async (task) => {
+      await task.renderTile(
+        Transfer(
+          {
+            canvas,
+            coords,
+            scaleFactor,
+            currentLayer,
+          },
+          [canvas]
+        )
+      );
     });
   }
 
@@ -175,7 +255,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     y: number,
     level: number,
     longitude: number,
-    latitude: number,
+    latitude: number
   ): Promise<ImageryLayerFeatureInfo[]> {
     const requestedTile = {
       x: x,

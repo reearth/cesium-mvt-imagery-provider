@@ -5,19 +5,23 @@ import {
   WebMercatorTilingScheme,
 } from "@cesium/engine";
 import Point from "@mapbox/point-geometry";
-import { VectorTile, VectorTileFeature, VectorTileLayer } from "@mapbox/vector-tile";
+import {
+  VectorTile,
+  VectorTileFeature,
+  VectorTileLayer,
+} from "@mapbox/vector-tile";
 import Pbf from "pbf";
-// import { View, TileCache, ZxySource } from "protomaps";
 
+import { RendererOption } from "./RenderWorker";
 import { isFeatureClicked } from "./terria";
 import {
   FeatureHandler,
-  Style,
   TileCoordinates,
   URLTemplate,
   CESIUM_CANVAS_SIZE,
-  ImageryProviderOption,
 } from "./types";
+import { Layer } from "./styleEvaluator/types";
+import { evalStyle } from "./style";
 
 const defaultParseTile = async (url?: string) => {
   const ab = await fetchResourceAsArrayBuffer(url);
@@ -38,27 +42,19 @@ const fetchResourceAsArrayBuffer = (url?: string) => {
   }
 
   return fetch(url)
-    .then(r => r.arrayBuffer())
+    .then((r) => r.arrayBuffer())
     ?.catch(() => {});
 };
 
-export type RendererOption = Pick<
-  ImageryProviderOption,
-  | "onFeaturesRendered"
-  | "onRenderFeature"
-  | "parseTile"
-  | "style"
-  | "onSelectFeature"
-  | "urlTemplate"
-> & { layerNames: string[]; tilingScheme: WebMercatorTilingScheme };
+export type RenderingContext2D =
+  | CanvasRenderingContext2D
+  | OffscreenCanvasRenderingContext2D;
 
-type RenderingContext2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export class Renderer {
   private _urlTemplate: URLTemplate;
   private _onRenderFeature?: FeatureHandler<boolean | void>;
   private _onFeaturesRendered?: () => void;
-  private _style?: FeatureHandler<Style>;
   private _onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
   private _parseTile: (url?: string) => Promise<VectorTile | undefined>;
   private readonly _tilingScheme: WebMercatorTilingScheme;
@@ -72,7 +68,6 @@ export class Renderer {
     this._onFeaturesRendered = options.onFeaturesRendered;
     this._onRenderFeature = options.onRenderFeature;
     console.log("A", this._onRenderFeature);
-    this._style = options.style;
     this._onSelectFeature = options.onSelectFeature;
     this._parseTile = options.parseTile ?? defaultParseTile;
     this._urlTemplate = options.urlTemplate;
@@ -82,10 +77,24 @@ export class Renderer {
     this._tilingScheme = new WebMercatorTilingScheme();
   }
 
-  async render(context: RenderingContext2D, requestedTile: TileCoordinates, scaleFactor: number) {
+  async render(
+    context: RenderingContext2D,
+    requestedTile: TileCoordinates,
+    scaleFactor: number,
+    currentLayer?: Layer
+  ) {
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
     await Promise.all(
-      this._layerNames.map(n => this._renderCanvas(url, context, requestedTile, n, scaleFactor)),
+      this._layerNames.map((n) =>
+        this._renderCanvas(
+          url,
+          context,
+          requestedTile,
+          n,
+          scaleFactor,
+          currentLayer
+        )
+      )
     );
   }
 
@@ -95,13 +104,14 @@ export class Renderer {
     requestedTile: TileCoordinates,
     layerName: string,
     scaleFactor: number,
+    currentLayer?: Layer
   ): Promise<void> {
     if (!url) return;
 
     const tile = await this._cachedTile(url);
 
     const layerNames = layerName.split(/, */).filter(Boolean);
-    const layers = layerNames.map(ln => tile?.layers[ln]);
+    const layers = layerNames.map((ln) => tile?.layers[ln]);
 
     if (!layers) {
       return;
@@ -119,10 +129,10 @@ export class Renderer {
       0,
       (this._tileHeight * scaleFactor) / CESIUM_CANVAS_SIZE,
       0,
-      0,
+      0
     );
 
-    layers.forEach(layer => {
+    layers.forEach((layer) => {
       if (!layer) return;
       // Vector tile works with extent [0, 4095], but canvas is only [0,255]
       const extentFactor = CESIUM_CANVAS_SIZE / layer.extent;
@@ -131,22 +141,30 @@ export class Renderer {
         const feature = layer.feature(i);
 
         // Early return.
-        // if (this._onRenderFeature && !this._onRenderFeature(feature, requestedTile)) {
-        //   continue;
-        // }
+        if (
+          this._onRenderFeature &&
+          !this._onRenderFeature(feature, requestedTile)
+        ) {
+          continue;
+        }
 
-        const style = this._style?.(feature, requestedTile) || {};
-        // console.log("Worker: Style: ", style, this._style);
-        // if (!style) {
-        //   continue;
-        // }
-        // context.fillStyle = style.fillStyle ?? context.fillStyle;
-        // context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
-        // context.lineWidth = style.lineWidth ?? context.lineWidth;
-        // context.lineJoin = style.lineJoin ?? context.lineJoin;
+        const style = evalStyle(feature, requestedTile, currentLayer);
+
+        if (!style) {
+          continue;
+        }
+        context.fillStyle = style.fillStyle ?? context.fillStyle;
+        context.strokeStyle = style.strokeStyle ?? context.strokeStyle;
+        context.lineWidth = style.lineWidth ?? context.lineWidth;
+        context.lineJoin = style.lineJoin ?? context.lineJoin;
 
         if (VectorTileFeature.types[feature.type] === "Polygon") {
-          this._renderPolygon(context, feature, extentFactor, (style.lineWidth ?? 1) > 0);
+          this._renderPolygon(
+            context,
+            feature,
+            extentFactor,
+            (style.lineWidth ?? 1) > 0
+          );
         } else if (VectorTileFeature.types[feature.type] === "Point") {
           this._renderPoint(context, feature, extentFactor);
         } else if (VectorTileFeature.types[feature.type] === "LineString") {
@@ -157,7 +175,7 @@ export class Renderer {
               requestedTile.level,
               requestedTile.x,
               requestedTile.y,
-            ].join("/")}`,
+            ].join("/")}`
           );
         }
       }
@@ -170,7 +188,7 @@ export class Renderer {
     context: RenderingContext2D,
     feature: VectorTileFeature,
     extentFactor: number,
-    shouldRenderLine: boolean,
+    shouldRenderLine: boolean
   ) {
     context.beginPath();
 
@@ -207,7 +225,11 @@ export class Renderer {
     if (verticesLength > 0) draw();
   }
 
-  _renderPoint(context: RenderingContext2D, feature: VectorTileFeature, extentFactor: number) {
+  _renderPoint(
+    context: RenderingContext2D,
+    feature: VectorTileFeature,
+    extentFactor: number
+  ) {
     context.beginPath();
 
     const coordinates = feature.loadGeometry();
@@ -225,7 +247,11 @@ export class Renderer {
     }
   }
 
-  _renderLineString(context: RenderingContext2D, feature: VectorTileFeature, extentFactor: number) {
+  _renderLineString(
+    context: RenderingContext2D,
+    feature: VectorTileFeature,
+    extentFactor: number
+  ) {
     context.beginPath();
 
     const coordinates = feature.loadGeometry();
@@ -242,7 +268,11 @@ export class Renderer {
     context.stroke();
   }
 
-  pickFeatures(requestedTile: TileCoordinates, longitude: number, latitude: number) {
+  pickFeatures(
+    requestedTile: TileCoordinates,
+    longitude: number,
+    latitude: number
+  ) {
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
     return this._pickFeaturesFromLayer(url, requestedTile, longitude, latitude);
   }
@@ -251,22 +281,27 @@ export class Renderer {
     url: string,
     requestedTile: TileCoordinates,
     longitude: number,
-    latitude: number,
+    latitude: number
   ) {
     const tile = await this._cachedTile(url);
 
     const pf = await Promise.all(
-      this._layerNames.map(async name => {
+      this._layerNames.map(async (name) => {
         const layer = tile?.layers[name];
         if (!layer) {
           return []; // return empty list of features for empty tile
         }
-        const f = await this._pickFeatures(requestedTile, longitude, latitude, layer);
+        const f = await this._pickFeatures(
+          requestedTile,
+          longitude,
+          latitude,
+          layer
+        );
         if (f) {
           return f;
         }
         return [];
-      }),
+      })
     );
 
     return pf.flat();
@@ -276,12 +311,12 @@ export class Renderer {
     requestedTile: TileCoordinates,
     longitude: number,
     latitude: number,
-    layer: VectorTileLayer,
+    layer: VectorTileLayer
   ): Promise<ImageryLayerFeatureInfo[]> {
     const boundRect = this._tilingScheme.tileXYToNativeRectangle(
       requestedTile.x,
       requestedTile.y,
-      requestedTile.level,
+      requestedTile.level
     );
     const x_range = [boundRect.west, boundRect.east];
     const y_range = [boundRect.north, boundRect.south];
@@ -291,19 +326,23 @@ export class Renderer {
       in_x_range: number[],
       in_y_range: number[],
       out_x_range: number[],
-      out_y_range: number[],
+      out_y_range: number[]
     ) {
       const offset = new Cartesian2();
       // Offset of point from top left corner of bounding box
-      Cartesian2.subtract(pos, new Cartesian2(in_x_range[0], in_y_range[0]), offset);
+      Cartesian2.subtract(
+        pos,
+        new Cartesian2(in_x_range[0], in_y_range[0]),
+        offset
+      );
       const scale = new Cartesian2(
         (out_x_range[1] - out_x_range[0]) / (in_x_range[1] - in_x_range[0]),
-        (out_y_range[1] - out_y_range[0]) / (in_y_range[1] - in_y_range[0]),
+        (out_y_range[1] - out_y_range[0]) / (in_y_range[1] - in_y_range[0])
       );
       return Cartesian2.add(
         Cartesian2.multiplyComponents(offset, scale, new Cartesian2()),
         new Cartesian2(out_x_range[0], out_y_range[0]),
-        new Cartesian2(),
+        new Cartesian2()
       );
     };
 
@@ -312,12 +351,14 @@ export class Renderer {
     const vt_range = [0, layer.extent - 1];
     const pos = map(
       Cartesian2.fromCartesian3(
-        this._tilingScheme.projection.project(new Cartographic(longitude, latitude)),
+        this._tilingScheme.projection.project(
+          new Cartographic(longitude, latitude)
+        )
       ),
       x_range,
       y_range,
       vt_range,
-      vt_range,
+      vt_range
     );
     const point = new Point(pos.x, pos.y);
 
@@ -370,13 +411,16 @@ const tileToCacheable = (v: VectorTile | undefined) => {
     }
     layers[key] = {
       ...layer,
-      feature: i => features[i],
+      feature: (i) => features[i],
     };
   }
   return { layers };
 };
 
-const buildURLWithTileCoordinates = (template: URLTemplate, tile: TileCoordinates) => {
+const buildURLWithTileCoordinates = (
+  template: URLTemplate,
+  tile: TileCoordinates
+) => {
   const decodedTemplate = decodeURIComponent(template);
   const z = decodedTemplate.replace("{z}", String(tile.level));
   const x = z.replace("{x}", String(tile.x));

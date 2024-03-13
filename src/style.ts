@@ -1,14 +1,18 @@
 import { VectorTileFeature } from "@mapbox/vector-tile";
-import { LRUCache } from "lru-cache";
-import { Style, TileCoordinates } from "./types";
-import { ComputedFeature, Feature, Geometry, Layer } from "./styleEvaluator/types";
-import { evalFeature } from "./styleEvaluator/evaluator";
 import { LineString, Point, Polygon } from "@turf/turf";
+import { LRUCache } from "lru-cache";
 
-const cachedStyleMap = new LRUCache<string, any>({max: 1000});
+import { evalFeature } from "./styleEvaluator/evaluator";
+import { ComputedFeature, Feature, Geometry, Layer } from "./styleEvaluator/types";
+import { Style, TileCoordinates } from "./types";
 
+const cachedStyleMap = new LRUCache<string, any>({ max: 1000 });
 
-export const evalStyle = (mvtFeature: VectorTileFeature, tile: TileCoordinates, layer?: Layer): Style | void => {
+export const evalStyle = (
+  mvtFeature: VectorTileFeature,
+  tile: TileCoordinates,
+  layer?: Layer,
+): Style | void => {
   const styleCacheKey = JSON.stringify(mvtFeature.properties);
   const cachedStyle = cachedStyleMap.get(styleCacheKey);
   if (cachedStyle) {
@@ -41,13 +45,9 @@ export const evalStyle = (mvtFeature: VectorTileFeature, tile: TileCoordinates, 
       const polygon = computedFeature?.polygon;
       return {
         fillStyle:
-          (polygon?.fill ?? true) && (polygon?.show ?? true)
-            ? polygon?.fillColor
-            : "rgba(0,0,0,0)", // hide the feature
+          (polygon?.fill ?? true) && (polygon?.show ?? true) ? polygon?.fillColor : "rgba(0,0,0,0)", // hide the feature
         strokeStyle:
-          polygon?.stroke && (polygon?.show ?? true)
-            ? polygon?.strokeColor
-            : "rgba(0,0,0,0)", // hide the feature
+          polygon?.stroke && (polygon?.show ?? true) ? polygon?.strokeColor : "rgba(0,0,0,0)", // hide the feature
         lineWidth: polygon?.strokeWidth,
         lineJoin: polygon?.lineJoin,
       };
@@ -74,9 +74,7 @@ export const evalStyle = (mvtFeature: VectorTileFeature, tile: TileCoordinates, 
             ? marker?.pointColor
             : "rgba(0,0,0,0)", // hide the feature
         strokeStyle:
-          marker?.pointColor && (marker?.show ?? true)
-            ? marker?.pointColor
-            : "rgba(0,0,0,0)", // hide the feature
+          marker?.pointColor && (marker?.show ?? true) ? marker?.pointColor : "rgba(0,0,0,0)", // hide the feature
         lineWidth: marker?.pointSize,
       };
     }
@@ -87,46 +85,46 @@ export const evalStyle = (mvtFeature: VectorTileFeature, tile: TileCoordinates, 
 };
 
 const makeFeature = (
-    id: string,
-    feature: VectorTileFeature,
-    tile: TileCoordinates,
-    appearance: "polygon" | "polyline" | "marker",
-  ): Feature => {
-    const geometry = feature.loadGeometry();
-    const [type, coordinates] = (() => {
-      if (appearance === "polygon") {
-        return [
-          "Polygon" as Polygon["type"],
-          geometry.map(points => points.map(p => [p.x, p.y])) as Polygon["coordinates"],
-        ];
-      }
-      if (appearance === "polyline") {
-        return [
-          "LineString" as LineString["type"],
-          geometry[0].map(p => [p.x, p.y]) as LineString["coordinates"],
-        ];
-      }
-      if (appearance === "marker") {
-        return [
-          "Point" as Point["type"],
-          [geometry[0][0].x, geometry[0][0].y] as Point["coordinates"],
-        ];
-      }
-  
-      throw new Error(`Unexpected appearance ${appearance}`);
-    })();
-    return {
-      type: "feature",
-      id,
-      geometry: {
-        type,
-        coordinates,
-      } as Geometry,
-      properties: feature.properties,
-      range: {
-        x: tile.x,
-        y: tile.y,
-        z: tile.level,
-      },
-    };
+  id: string,
+  feature: VectorTileFeature,
+  tile: TileCoordinates,
+  appearance: "polygon" | "polyline" | "marker",
+): Feature => {
+  const geometry = feature.loadGeometry();
+  const [type, coordinates] = (() => {
+    if (appearance === "polygon") {
+      return [
+        "Polygon" as Polygon["type"],
+        geometry.map(points => points.map(p => [p.x, p.y])) as Polygon["coordinates"],
+      ];
+    }
+    if (appearance === "polyline") {
+      return [
+        "LineString" as LineString["type"],
+        geometry[0].map(p => [p.x, p.y]) as LineString["coordinates"],
+      ];
+    }
+    if (appearance === "marker") {
+      return [
+        "Point" as Point["type"],
+        [geometry[0][0].x, geometry[0][0].y] as Point["coordinates"],
+      ];
+    }
+
+    throw new Error(`Unexpected appearance ${appearance}`);
+  })();
+  return {
+    type: "feature",
+    id,
+    geometry: {
+      type,
+      coordinates,
+    } as Geometry,
+    properties: feature.properties,
+    range: {
+      x: tile.x,
+      y: tile.y,
+      z: tile.level,
+    },
+  };
 };

@@ -1,4 +1,5 @@
 import Point from "@mapbox/point-geometry";
+import md5 from "js-md5";
 
 const tempPoint = new Point(0, 0);
 
@@ -47,3 +48,10 @@ function isLineSegmentClicked(
   const distanceSquared = mouse.distSqr(nearest);
   return distanceSquared <= dist ** 2;
 }
+
+export const generateIDWithMD5 = (id: string) => {
+  const hash = md5.create();
+  hash.update(id);
+
+  return hash.hex();
+};

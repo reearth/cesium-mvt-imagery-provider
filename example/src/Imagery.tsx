@@ -4,7 +4,7 @@ import { useCesium } from "resium";
 
 export const Imagery: FC = () => {
   const { viewer } = useCesium();
-  const [isFeatureSelected, setIsFeatureSelected] = useState<boolean>(false);
+  const [isFeatureSelected] = useState<boolean>(false);
   useEffect(() => {
     const imageryProvider = new MVTImageryProvider({
       urlTemplate:

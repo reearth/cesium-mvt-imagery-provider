@@ -13,10 +13,7 @@ export type JPLiteral = {
 };
 
 export const EXPRESSION_CACHES = new Map<string, Node | Error>();
-export const REPLACED_VARIABLES_CACHE = new Map<
-  string,
-  [string, JPLiteral[]]
->();
+export const REPLACED_VARIABLES_CACHE = new Map<string, [string, JPLiteral[]]>();
 const DEFINE_PLACEHOLDER_REGEX_CACHE = new Map<string, RegExp>();
 const DEFINE_REPLACEMENT_CACHE = new Map<string, string>();
 
@@ -37,13 +34,10 @@ export class Expression {
       const originalExpression = expression;
       [expression, literalJP] = replaceVariables(
         removeBackslashes(expression),
-        this._feature?.properties
+        this._feature?.properties,
       );
       if (expression.includes(VARIABLE_PREFIX)) {
-        REPLACED_VARIABLES_CACHE.set(originalExpression, [
-          expression,
-          literalJP,
-        ]);
+        REPLACED_VARIABLES_CACHE.set(originalExpression, [expression, literalJP]);
       }
     }
 
@@ -53,7 +47,6 @@ export class Expression {
     } else {
       if (literalJP.length !== 0) {
         for (const elem of literalJP) {
-          // @ts-ignore
           jsep.addLiteral(elem.literalName, elem.literalValue);
         }
       }
@@ -93,15 +86,11 @@ export function replaceDefines(expression: string, defines: any): string {
   }
   let definePlaceholderRegex = DEFINE_PLACEHOLDER_REGEX_CACHE.get(expression);
   if (!definePlaceholderRegex) {
-    definePlaceholderRegex = new RegExp(
-      `\\$\\{(${Object.keys(defines).join("|")})\\}`,
-      "g"
-    );
+    definePlaceholderRegex = new RegExp(`\\$\\{(${Object.keys(defines).join("|")})\\}`, "g");
     DEFINE_PLACEHOLDER_REGEX_CACHE.set(expression, definePlaceholderRegex);
   }
-  const replacedExpression = expression.replace(
-    definePlaceholderRegex,
-    (_, key) => (typeof defines[key] !== "undefined" ? `(${defines[key]})` : "")
+  const replacedExpression = expression.replace(definePlaceholderRegex, (_, key) =>
+    typeof defines[key] !== "undefined" ? `(${defines[key]})` : "",
   );
 
   DEFINE_REPLACEMENT_CACHE.set(cacheKey, replacedExpression);
@@ -115,14 +104,11 @@ export function removeBackslashes(expression: string): string {
 export function clearExpressionCaches(
   expression: string,
   feature: Feature | undefined,
-  defines: any | undefined
+  defines: any | undefined,
 ) {
   REPLACED_VARIABLES_CACHE.delete(expression);
 
   expression = replaceDefines(expression, defines);
-  [expression] = replaceVariables(
-    removeBackslashes(expression),
-    feature?.properties
-  );
+  [expression] = replaceVariables(removeBackslashes(expression), feature?.properties);
   EXPRESSION_CACHES.delete(expression);
 }

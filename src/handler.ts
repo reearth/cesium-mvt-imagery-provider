@@ -1,6 +1,5 @@
-import { Renderer } from "./Renderer";
+import { Renderer, RendererOption } from "./renderer";
 import { RenderHandler } from "./renderHandler";
-import { RendererOption } from "./RenderWorker";
 import { Layer } from "./styleEvaluator/types";
 import { TileCoordinates } from "./types";
 
@@ -19,12 +18,19 @@ export class RenderMainHandler extends RenderHandler {
     requestedTile: TileCoordinates;
     scaleFactor: number;
     currentLayer?: Layer;
+    updatedAt?: number;
   }) {
     const ctx = options.canvas.getContext("2d");
     if (!ctx) {
       return;
     }
-    await this.renderer?.render(ctx, options.requestedTile, options.scaleFactor, options.currentLayer);
+    await this.renderer?.render(
+      ctx,
+      options.requestedTile,
+      options.scaleFactor,
+      options.currentLayer,
+      options.updatedAt,
+    );
   }
 
   async pick(options: { requestedTile: TileCoordinates; longitude: number; latitude: number }) {

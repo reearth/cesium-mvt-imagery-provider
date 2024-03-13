@@ -24,7 +24,7 @@ export type EvalResult = {
 
 export async function evalLayer(
   layer: LayerSimple,
-  ctx: EvalContext
+  ctx: EvalContext,
 ): Promise<EvalResult | undefined> {
   if (layer.type === "simple") {
     return evalSimpleLayer(layer, ctx);
@@ -32,10 +32,7 @@ export async function evalLayer(
   return;
 }
 
-export function evalFeature(
-  layer: Layer,
-  feature: Feature
-): ComputedFeature | undefined {
+export function evalFeature(layer: Layer, feature: Feature): ComputedFeature | undefined {
   if (layer.type === "simple") {
     return evalSimpleLayerFeature(layer, feature);
   }

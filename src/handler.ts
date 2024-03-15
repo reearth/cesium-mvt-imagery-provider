@@ -1,6 +1,6 @@
 import { Renderer, RendererOption } from "./renderer";
 import { RenderHandler } from "./renderHandler";
-import { Layer } from "./styleEvaluator/types";
+import { LayerSimple } from "./styleEvaluator/types";
 import { TileCoordinates } from "./types";
 
 export class RenderMainHandler extends RenderHandler {
@@ -17,7 +17,7 @@ export class RenderMainHandler extends RenderHandler {
     canvas: HTMLCanvasElement;
     requestedTile: TileCoordinates;
     scaleFactor: number;
-    currentLayer?: Layer;
+    currentLayer?: LayerSimple;
     updatedAt?: number;
   }) {
     const ctx = options.canvas.getContext("2d");
@@ -33,12 +33,18 @@ export class RenderMainHandler extends RenderHandler {
     );
   }
 
-  async pick(options: { requestedTile: TileCoordinates; longitude: number; latitude: number }) {
+  async pick(options: {
+    requestedTile: TileCoordinates;
+    longitude: number;
+    latitude: number;
+    currentLayer?: LayerSimple;
+  }) {
     return (
       (await this.renderer?.pickFeatures(
         options.requestedTile,
         options.longitude,
         options.latitude,
+        options.currentLayer,
       )) ?? []
     );
   }

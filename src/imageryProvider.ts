@@ -10,6 +10,7 @@ import {
   ImageryLayerFeatureInfo,
 } from "cesium";
 import { LRUCache } from "lru-cache";
+import { Transfer } from "threads";
 
 import { RenderMainHandler } from "./handler";
 import { RenderHandler } from "./renderHandler";
@@ -17,12 +18,14 @@ import { LayerSimple } from "./styleEvaluator/types";
 import { CESIUM_CANVAS_SIZE, ImageryProviderOption, TileCoordinates } from "./types";
 import { RenderWorkerHandler } from "./worker/handler";
 import WorkerBlob from "./worker/receiver?worker&inline";
+import { queue } from "./workerPool";
 
 type ImageryProviderTrait = ImageryProvider;
 
 export class MVTImageryProvider implements ImageryProviderTrait {
   static maximumTasks = 50;
   static maximumTasksPerImagery = 6;
+  // private taskCount = 0;
 
   private readonly tileCache: LRUCache<string, HTMLCanvasElement> | undefined;
 
@@ -43,6 +46,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _handler: RenderHandler;
   private readonly _currentLayer?: LayerSimple;
   private readonly _updatedAt?: number;
+  // private readonly _useWorker?: boolean;
 
   constructor(options: ImageryProviderOption) {
     this._minimumLevel = options.minimumLevel ?? 0;
@@ -72,6 +76,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       .then(() => true);
     this._currentLayer = options.layer;
     this._updatedAt = options.updatedAt;
+    // this._useWorker = options.worker ?? false;
   }
 
   get tileWidth() {
@@ -157,6 +162,13 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     level: number,
     _request?: Request | undefined,
   ): Promise<ImageryTypes> | undefined {
+    // if (
+    //   this.taskCount >= MVTImageryProvider.maximumTasksPerImagery ||
+    //   !canQueue(MVTImageryProvider.maximumTasks)
+    // ) {
+    //   return;
+    // }
+
     const cacheKey = `${x}/${y}/${level}`;
     if (this.tileCache?.has(cacheKey) === true) {
       const canvas = this.tileCache.get(cacheKey);
@@ -175,6 +187,29 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     const currentLayer = this._currentLayer;
     const updatedAt = this._updatedAt;
 
+    console.log("REACHED HERE!!!: ", currentLayer, updatedAt);
+
+    // const offscreen = canvas.transferControlToOffscreen();
+
+    // ++this.taskCount;
+
+    // if (this._useWorker) {
+    //   return this.renderTile(requestedTile, offscreen, scaleFactor, currentLayer, updatedAt)
+    //     .then(() => {
+    //       this.tileCache?.set(cacheKey, canvas);
+    //       return canvas;
+    //     })
+    //     .catch(error => {
+    //       if (error instanceof Error && error.message.startsWith("Unimplemented type")) {
+    //         return canvas;
+    //       }
+    //       throw error;
+    //     })
+    //     .finally(() => {
+    //       // --this.taskCount;
+    //     });
+    // }
+
     return this.readyPromise.then(() => {
       return this._handler
         .render({
@@ -187,6 +222,29 @@ export class MVTImageryProvider implements ImageryProviderTrait {
         .then(() => {
           return canvas;
         });
+    });
+  }
+
+  async renderTile(
+    coords: TileCoordinates,
+    canvas: OffscreenCanvas,
+    scaleFactor: number,
+    currentLayer?: LayerSimple,
+    updatedAt?: number,
+  ): Promise<void> {
+    await queue(async task => {
+      await task.renderTile(
+        Transfer(
+          {
+            canvas,
+            coords,
+            scaleFactor,
+            currentLayer,
+            updatedAt,
+          },
+          [canvas],
+        ),
+      );
     });
   }
 
@@ -203,10 +261,13 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       level: level,
     };
 
+    const currentLayer = this._currentLayer;
+
     return this._handler.pick({
       requestedTile,
       longitude,
       latitude,
+      currentLayer,
     });
 
     // return (await this._pickFeaturesFromLayer(url, requestedTile, longitude, latitude)).flat();

@@ -1,14 +1,14 @@
 import { WebMercatorTilingScheme } from "@cesium/engine";
-import MPoint from "@mapbox/point-geometry";
+import Point from "@mapbox/point-geometry";
 import { VectorTile, VectorTileFeature, VectorTileLayer } from "@mapbox/vector-tile";
 import { Cartesian2, Cartographic, ImageryLayerFeatureInfo } from "cesium";
 import Pbf from "pbf";
 
+import { onSelectFeature } from "./featureSelect";
 import { evalStyle } from "./style";
 import { Layer, LayerSimple } from "./styleEvaluator/types";
-import { TileCoordinates, URLTemplate, CESIUM_CANVAS_SIZE, ImageryProviderOption } from "./types";
 import { isFeatureClicked } from "./terria";
-import { onSelectFeature } from "./featureSelect";
+import { TileCoordinates, URLTemplate, CESIUM_CANVAS_SIZE, ImageryProviderOption } from "./types";
 
 const defaultParseTile = async (url?: string) => {
   const ab = await fetchResourceAsArrayBuffer(url);
@@ -33,7 +33,7 @@ const fetchResourceAsArrayBuffer = (url?: string) => {
     ?.catch(() => {});
 };
 
-let currentTime: number | undefined;
+// let currentTime: number | undefined;
 
 export type RendererOption = Pick<ImageryProviderOption, "urlTemplate" | "maximumLevel"> & {
   layerNames: string[];
@@ -45,6 +45,7 @@ export interface RenderTileParams extends RendererOption {
   canvas: OffscreenCanvas;
   scaleFactor: number;
   currentLayer?: LayerSimple;
+  updatedAt?: number;
 }
 
 export type RenderingContext2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -76,6 +77,7 @@ export class Renderer {
     currentLayer?: Layer,
     updatedAt?: number,
   ) {
+    console.log("RENDER IS CALLED!!!");
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
     await Promise.all(
       this._layerNames.map(n =>
@@ -91,7 +93,7 @@ export class Renderer {
     layerName: string,
     scaleFactor: number,
     currentLayer?: Layer,
-    updatedAt?: number,
+    _updatedAt?: number,
   ): Promise<void> {
     if (!url) return;
 
@@ -127,10 +129,10 @@ export class Renderer {
       for (let i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
 
-        // Early return.
-        if (onRenderFeature(updatedAt)) {
-          continue;
-        }
+        // // Early return.
+        // if (onRenderFeature(updatedAt)) {
+        //   continue;
+        // }
 
         const style = evalStyle(feature, requestedTile, currentLayer);
 
@@ -237,9 +239,14 @@ export class Renderer {
     context.stroke();
   }
 
-  pickFeatures(requestedTile: TileCoordinates, longitude: number, latitude: number) {
+  pickFeatures(
+    requestedTile: TileCoordinates,
+    longitude: number,
+    latitude: number,
+    currentLayer?: LayerSimple,
+  ) {
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
-    return this._pickFeaturesFromLayer(url, requestedTile, longitude, latitude);
+    return this._pickFeaturesFromLayer(url, requestedTile, longitude, latitude, currentLayer);
   }
 
   async _pickFeaturesFromLayer(
@@ -247,6 +254,7 @@ export class Renderer {
     requestedTile: TileCoordinates,
     longitude: number,
     latitude: number,
+    currentLayer?: LayerSimple,
   ) {
     const tile = await this._cachedTile(url);
 
@@ -256,7 +264,7 @@ export class Renderer {
         if (!layer) {
           return []; // return empty list of features for empty tile
         }
-        const f = await this._pickFeatures(requestedTile, longitude, latitude, layer);
+        const f = await this._pickFeatures(requestedTile, longitude, latitude, layer, currentLayer);
         if (f) {
           return f;
         }
@@ -272,6 +280,7 @@ export class Renderer {
     longitude: number,
     latitude: number,
     layer: VectorTileLayer,
+    currentLayer?: LayerSimple,
   ): Promise<ImageryLayerFeatureInfo[]> {
     const boundRect = this._tilingScheme.tileXYToNativeRectangle(
       requestedTile.x,
@@ -314,7 +323,7 @@ export class Renderer {
       vt_range,
       vt_range,
     );
-    const point = new MPoint(pos.x, pos.y);
+    const point = new Point(pos.x, pos.y);
 
     for (let i = 0; i < layer.length; i++) {
       const feature = layer.feature(i);
@@ -322,7 +331,7 @@ export class Renderer {
         VectorTileFeature.types[feature.type] === "Polygon" &&
         isFeatureClicked(feature.loadGeometry(), point)
       ) {
-        const feat = onSelectFeature(feature, requestedTile);
+        const feat = onSelectFeature(feature, requestedTile, currentLayer);
         if (feat) {
           features.push(feat);
         }
@@ -377,9 +386,9 @@ const buildURLWithTileCoordinates = (template: URLTemplate, tile: TileCoordinate
   return y;
 };
 
-const onRenderFeature = (updatedAt?: number): boolean => {
-  if (!currentTime && !updatedAt) {
-    currentTime = updatedAt;
-  }
-  return currentTime === updatedAt;
-};
+// const onRenderFeature = (updatedAt?: number): boolean => {
+//   if (!currentTime && !updatedAt) {
+//     currentTime = updatedAt;
+//   }
+//   return currentTime === updatedAt;
+// };

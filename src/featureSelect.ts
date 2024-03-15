@@ -3,14 +3,14 @@ import { LineString, Polygon, Point } from "@turf/turf";
 import { ImageryLayerFeatureInfo } from "cesium";
 
 import { evalFeature } from "./styleEvaluator/evaluator";
-import { Feature, Geometry, Layer } from "./styleEvaluator/types";
+import { Feature, Geometry, LayerSimple } from "./styleEvaluator/types";
 import { TileCoordinates } from "./types";
 import { generateIDWithMD5 } from "./util";
 
 export const onSelectFeature = (
   mvtFeature: VectorTileFeature,
   tile: TileCoordinates,
-  layer?: Layer,
+  layer?: LayerSimple,
 ) => {
   if (!layer) {
     return;

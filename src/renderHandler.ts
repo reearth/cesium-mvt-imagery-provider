@@ -17,6 +17,7 @@ export abstract class RenderHandler {
     requestedTile: TileCoordinates;
     longitude: number;
     latitude: number;
+    currentLayer?: LayerSimple;
   }): Promise<ImageryLayerFeatureInfo[]>;
   abstract dispose(): void;
 }

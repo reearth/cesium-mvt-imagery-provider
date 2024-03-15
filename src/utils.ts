@@ -1,6 +1,6 @@
-import { TileCoordinates, URLTemplate } from "./types";
 import Point from "@mapbox/point-geometry";
-import md5 from "js-md5";
+
+import { TileCoordinates, URLTemplate } from "./types";
 
 export const buildURLWithTileCoordinates = (template: URLTemplate, tile: TileCoordinates) => {
   const decodedTemplate = decodeURIComponent(template);
@@ -78,9 +78,14 @@ function isLineSegmentClicked(
   return distanceSquared <= dist ** 2;
 }
 
-export const generateIDWithMD5 = (id: string) => {
-  const hash = md5.create();
-  hash.update(id);
+export const generateID = (id: string) => {
+  let hash = 0;
 
-  return hash.hex();
+  for (let i = 0; i < id.length; i++) {
+    const char = id.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash &= hash;
+  }
+
+  return hash.toString(16);
 };

@@ -4,35 +4,12 @@ import { useCesium } from "resium";
 
 export const Imagery: FC = () => {
   const { viewer } = useCesium();
-  const [isFeatureSelected, setIsFeatureSelected] = useState<boolean>(false);
+  const [isFeatureSelected] = useState<boolean>(false);
   useEffect(() => {
     const imageryProvider = new MVTImageryProvider({
       urlTemplate: "/sample_mvt/{z}/{x}/{y}.mvt",
       layerName: "layerName",
-      onRenderFeature: () => {
-        console.log("Before rendering feature");
-        return true;
-      },
-      onFeaturesRendered: () => {
-        console.log("After rendering feature");
-      },
-      style: (_feature, _tileCoords) => {
-        if (isFeatureSelected) {
-          return {
-            strokeStyle: "orange",
-            fillStyle: "orange",
-            lineWidth: 1,
-          };
-        }
-        return {
-          strokeStyle: "green",
-          fillStyle: "green",
-          lineWidth: 1,
-        };
-      },
-      onSelectFeature: _feature => {
-        setIsFeatureSelected(v => !v);
-      },
+      worker: true,
       credit: "cesium.js",
     });
 

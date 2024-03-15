@@ -1,6 +1,6 @@
 {
   "name": "@reearth/cesium-mvt-imagery-provider",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Custom ImageryProvider for Mapbox Vector Tiles (extended for Re:Earth)",
   "source": "./src/index.ts",
   "main": "./dist/cesium-mvt-imagery-provider.umd.js",

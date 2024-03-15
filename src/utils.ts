@@ -1,4 +1,34 @@
+import { TileCoordinates, URLTemplate } from "./types";
 import Point from "@mapbox/point-geometry";
+import md5 from "js-md5";
+
+export const buildURLWithTileCoordinates = (template: URLTemplate, tile: TileCoordinates) => {
+  const decodedTemplate = decodeURIComponent(template);
+  const z = decodedTemplate.replace("{z}", String(tile.level));
+  const x = z.replace("{x}", String(tile.x));
+  const y = x.replace("{y}", String(tile.y));
+  return y;
+};
+
+/**
+ * Often we want to make an array of keys of an object type,
+ * but if we just specify the key names directly, we may forget to change the array if the object type is changed.
+ * With this function, the compiler checks the object keys for completeness, so the array of keys is always up to date.
+ */
+export function objKeys<T extends string | number | symbol>(obj: { [k in T]: 1 }): T[] {
+  return Object.keys(obj) as T[];
+}
+
+export function defined(value: any) {
+  return value !== undefined && value !== null;
+}
+
+export function defaultValue(a: any, b: any) {
+  if (a !== undefined && a !== null) {
+    return a;
+  }
+  return b;
+}
 
 const tempPoint = new Point(0, 0);
 
@@ -47,3 +77,10 @@ function isLineSegmentClicked(
   const distanceSquared = mouse.distSqr(nearest);
   return distanceSquared <= dist ** 2;
 }
+
+export const generateIDWithMD5 = (id: string) => {
+  const hash = md5.create();
+  hash.update(id);
+
+  return hash.hex();
+};

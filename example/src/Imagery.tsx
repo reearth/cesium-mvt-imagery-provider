@@ -10,32 +10,6 @@ export const Imagery: FC = () => {
       urlTemplate:
         "https://assets.cms.plateau.reearth.io/assets/17/53645b-5964-491a-9dd8-c1a91ce3937a/13100_tokyo23-ku_2022_mvt_1_2_op_tran_lod1/{z}/{x}/{y}.mvt",
       layerName: "Road",
-      // TODO: Support callback
-      // onRenderFeature: () => {
-      //   console.log("Before rendering feature");
-      //   return true;
-      // },
-      // onFeaturesRendered: () => {
-      //   console.log("After rendering feature");
-      // },
-      // style: (_feature, _tileCoords) => {
-      //   console.log("CALL???");
-      //   if (isFeatureSelected) {
-      //     return {
-      //       strokeStyle: "orange",
-      //       fillStyle: "orange",
-      //       lineWidth: 1,
-      //     };
-      //   }
-      //   return {
-      //     strokeStyle: "green",
-      //     fillStyle: "green",
-      //     lineWidth: 1,
-      //   };
-      // },
-      // onSelectFeature: _feature => {
-      //   setIsFeatureSelected(v => !v);
-      // },
       worker: true,
       credit: "cesium.js",
     });

@@ -6,16 +6,7 @@
 const imageryProvider = new MVTImageryProvider({
   urlTemplate: "http://localhost:8080/sample_mvt/{z}/{x}/{y}.mvt",
   layerName: "layerName", // or "layerName1,layerName2,layerName3"
-  style: _feature => {
-    return {
-      strokeStyle: "green",
-      fillStyle: "green",
-      lineWidth: 1,
-    };
-  },
-  onSelectFeature: _feature => {
-    console.log("Feature is selected");
-  },
+  worker: true, // by default false
   credit: "cesium.js",
 });
 

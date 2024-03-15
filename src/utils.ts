@@ -1,5 +1,35 @@
 import Point from "@mapbox/point-geometry";
 
+import { TileCoordinates, URLTemplate } from "./types";
+
+export const buildURLWithTileCoordinates = (template: URLTemplate, tile: TileCoordinates) => {
+  const decodedTemplate = decodeURIComponent(template);
+  const z = decodedTemplate.replace("{z}", String(tile.level));
+  const x = z.replace("{x}", String(tile.x));
+  const y = x.replace("{y}", String(tile.y));
+  return y;
+};
+
+/**
+ * Often we want to make an array of keys of an object type,
+ * but if we just specify the key names directly, we may forget to change the array if the object type is changed.
+ * With this function, the compiler checks the object keys for completeness, so the array of keys is always up to date.
+ */
+export function objKeys<T extends string | number | symbol>(obj: { [k in T]: 1 }): T[] {
+  return Object.keys(obj) as T[];
+}
+
+export function defined(value: any) {
+  return value !== undefined && value !== null;
+}
+
+export function defaultValue(a: any, b: any) {
+  if (a !== undefined && a !== null) {
+    return a;
+  }
+  return b;
+}
+
 const tempPoint = new Point(0, 0);
 
 export function isPointClicked(feature: Point[][], clicked: Point, radius: number): boolean {
@@ -47,3 +77,15 @@ function isLineSegmentClicked(
   const distanceSquared = mouse.distSqr(nearest);
   return distanceSquared <= dist ** 2;
 }
+
+export const generateID = (id: string) => {
+  let hash = 0;
+
+  for (let i = 0; i < id.length; i++) {
+    const char = id.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash &= hash;
+  }
+
+  return hash.toString(16);
+};

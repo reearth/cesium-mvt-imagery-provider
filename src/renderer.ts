@@ -35,18 +35,9 @@ const fetchResourceAsArrayBuffer = (url?: string) => {
 
 // let currentTime: number | undefined;
 
-export type RendererOption = Pick<ImageryProviderOption, "urlTemplate" | "maximumLevel"> & {
+export type RendererOption = Pick<ImageryProviderOption, "urlTemplate"> & {
   layerNames: string[];
-  tilingScheme: WebMercatorTilingScheme;
 };
-
-export interface RenderTileParams extends RendererOption {
-  coords: TileCoordinates;
-  canvas: OffscreenCanvas;
-  scaleFactor: number;
-  currentLayer?: LayerSimple;
-  updatedAt?: number;
-}
 
 export type RenderingContext2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -77,7 +68,6 @@ export class Renderer {
     currentLayer?: Layer,
     updatedAt?: number,
   ) {
-    console.log("RENDER IS CALLED!!!");
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
     await Promise.all(
       this._layerNames.map(n =>

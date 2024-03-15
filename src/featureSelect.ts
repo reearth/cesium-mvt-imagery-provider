@@ -5,7 +5,7 @@ import { ImageryLayerFeatureInfo } from "cesium";
 import { evalFeature } from "./styleEvaluator/evaluator";
 import { Feature, Geometry, LayerSimple } from "./styleEvaluator/types";
 import { TileCoordinates } from "./types";
-import { generateIDWithMD5 } from "./util";
+import { generateIDWithMD5 } from "./utils";
 
 export const onSelectFeature = (
   mvtFeature: VectorTileFeature,

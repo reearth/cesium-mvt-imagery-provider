@@ -9,9 +9,6 @@ export default defineConfig(() => ({
       rollupTypes: true,
     }),
   ],
-  worker: {
-    format: "es",
-  },
   build: {
     lib: {
       entry: "src/index.ts",

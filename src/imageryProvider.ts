@@ -10,22 +10,20 @@ import {
   ImageryLayerFeatureInfo,
 } from "cesium";
 import { LRUCache } from "lru-cache";
-import { Transfer } from "threads";
 
 import { RenderMainHandler } from "./handler";
 import { RenderHandler } from "./renderHandler";
 import { LayerSimple } from "./styleEvaluator/types";
-import { CESIUM_CANVAS_SIZE, ImageryProviderOption, TileCoordinates } from "./types";
+import { CESIUM_CANVAS_SIZE, ImageryProviderOption, TileCoordinates, URLTemplate } from "./types";
 import { RenderWorkerHandler } from "./worker/handler";
-import WorkerBlob from "./worker/receiver?worker&inline";
-import { queue } from "./workerPool";
+import { canQueue } from "./worker/workerPool";
 
 type ImageryProviderTrait = ImageryProvider;
 
 export class MVTImageryProvider implements ImageryProviderTrait {
   static maximumTasks = 50;
   static maximumTasksPerImagery = 6;
-  // private taskCount = 0;
+  private taskCount = 0;
 
   private readonly tileCache: LRUCache<string, HTMLCanvasElement> | undefined;
 
@@ -46,7 +44,10 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _handler: RenderHandler;
   private readonly _currentLayer?: LayerSimple;
   private readonly _updatedAt?: number;
-  // private readonly _useWorker?: boolean;
+  private readonly _useWorker?: boolean;
+
+  private readonly _urlTemplate: URLTemplate;
+  private readonly _layerNames: string[];
 
   constructor(options: ImageryProviderOption) {
     this._minimumLevel = options.minimumLevel ?? 0;
@@ -62,21 +63,21 @@ export class MVTImageryProvider implements ImageryProviderTrait {
 
     this._rectangle = this._tilingScheme.rectangle;
 
-    this._handler = options.worker
-      ? new RenderWorkerHandler(new WorkerBlob())
-      : new RenderMainHandler();
+    this._handler = options.worker ? new RenderWorkerHandler() : new RenderMainHandler();
     this._ready = true;
+
+    this._urlTemplate = options.urlTemplate;
+    this._layerNames = options.layerName.split(/, */).filter(Boolean);
 
     this._readyPromise = this._handler
       .init({
-        ...options,
+        urlTemplate: options.urlTemplate,
         layerNames: options.layerName.split(/, */).filter(Boolean),
-        tilingScheme: this.tilingScheme,
       })
       .then(() => true);
     this._currentLayer = options.layer;
     this._updatedAt = options.updatedAt;
-    // this._useWorker = options.worker ?? false;
+    this._useWorker = options.worker ?? false;
   }
 
   get tileWidth() {
@@ -162,12 +163,13 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     level: number,
     _request?: Request | undefined,
   ): Promise<ImageryTypes> | undefined {
-    // if (
-    //   this.taskCount >= MVTImageryProvider.maximumTasksPerImagery ||
-    //   !canQueue(MVTImageryProvider.maximumTasks)
-    // ) {
-    //   return;
-    // }
+    if (
+      this._useWorker &&
+      (this.taskCount >= MVTImageryProvider.maximumTasksPerImagery ||
+        !canQueue(MVTImageryProvider.maximumTasks))
+    ) {
+      return;
+    }
 
     const cacheKey = `${x}/${y}/${level}`;
     if (this.tileCache?.has(cacheKey) === true) {
@@ -186,29 +188,10 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     canvas.height = this._tileHeight * scaleFactor;
     const currentLayer = this._currentLayer;
     const updatedAt = this._updatedAt;
+    const urlTemplate = this._urlTemplate;
+    const layerNames = this._layerNames;
 
-    console.log("REACHED HERE!!!: ", currentLayer, updatedAt);
-
-    // const offscreen = canvas.transferControlToOffscreen();
-
-    // ++this.taskCount;
-
-    // if (this._useWorker) {
-    //   return this.renderTile(requestedTile, offscreen, scaleFactor, currentLayer, updatedAt)
-    //     .then(() => {
-    //       this.tileCache?.set(cacheKey, canvas);
-    //       return canvas;
-    //     })
-    //     .catch(error => {
-    //       if (error instanceof Error && error.message.startsWith("Unimplemented type")) {
-    //         return canvas;
-    //       }
-    //       throw error;
-    //     })
-    //     .finally(() => {
-    //       // --this.taskCount;
-    //     });
-    // }
+    this._useWorker ?? ++this.taskCount;
 
     return this.readyPromise.then(() => {
       return this._handler
@@ -216,35 +199,24 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           canvas,
           requestedTile,
           scaleFactor,
+          urlTemplate,
+          layerNames,
           currentLayer,
           updatedAt,
         })
         .then(() => {
+          this.tileCache?.set(cacheKey, canvas);
           return canvas;
+        })
+        .catch(error => {
+          if (error instanceof Error && error.message.startsWith("Unimplemented type")) {
+            return canvas;
+          }
+          throw error;
+        })
+        .finally(() => {
+          this._useWorker ?? --this.taskCount;
         });
-    });
-  }
-
-  async renderTile(
-    coords: TileCoordinates,
-    canvas: OffscreenCanvas,
-    scaleFactor: number,
-    currentLayer?: LayerSimple,
-    updatedAt?: number,
-  ): Promise<void> {
-    await queue(async task => {
-      await task.renderTile(
-        Transfer(
-          {
-            canvas,
-            coords,
-            scaleFactor,
-            currentLayer,
-            updatedAt,
-          },
-          [canvas],
-        ),
-      );
     });
   }
 
@@ -262,15 +234,17 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     };
 
     const currentLayer = this._currentLayer;
+    const urlTemplate = this._urlTemplate;
+    const layerNames = this._layerNames;
 
     return this._handler.pick({
       requestedTile,
       longitude,
       latitude,
+      urlTemplate,
+      layerNames,
       currentLayer,
     });
-
-    // return (await this._pickFeaturesFromLayer(url, requestedTile, longitude, latitude)).flat();
   }
 
   dispose() {

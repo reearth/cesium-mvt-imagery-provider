@@ -7,11 +7,7 @@ export class ConditionalExpression {
   private _feature?: Feature;
   private _memoizedResult: any;
 
-  constructor(
-    conditionsExpression: ConditionsExpression,
-    feature?: Feature,
-    defines?: any
-  ) {
+  constructor(conditionsExpression: ConditionsExpression, feature?: Feature, defines?: any) {
     this._conditions = conditionsExpression.conditions;
     this._runtimeConditions = [];
     this._feature = feature;
@@ -21,12 +17,12 @@ export class ConditionalExpression {
   }
 
   setRuntime(defines: any) {
-    const runtimeConditions = this._conditions?.map((statement) => {
+    const runtimeConditions = this._conditions?.map(statement => {
       const cond = String(statement[0]);
       const condExpression = String(statement[1]);
       return new Statement(
         new Expression(cond, this._feature, defines),
-        new Expression(condExpression, this._feature, defines)
+        new Expression(condExpression, this._feature, defines),
       );
     });
     this._runtimeConditions = runtimeConditions ?? [];

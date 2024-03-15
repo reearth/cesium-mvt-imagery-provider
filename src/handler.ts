@@ -1,7 +1,7 @@
 import { Renderer, RendererOption } from "./renderer";
 import { RenderHandler } from "./renderHandler";
 import { LayerSimple } from "./styleEvaluator/types";
-import { TileCoordinates } from "./types";
+import { TileCoordinates, URLTemplate } from "./types";
 
 export class RenderMainHandler extends RenderHandler {
   renderer?: Renderer;
@@ -17,6 +17,8 @@ export class RenderMainHandler extends RenderHandler {
     canvas: HTMLCanvasElement;
     requestedTile: TileCoordinates;
     scaleFactor: number;
+    urlTemplate: URLTemplate;
+    layerNames: string[];
     currentLayer?: LayerSimple;
     updatedAt?: number;
   }) {
@@ -37,6 +39,8 @@ export class RenderMainHandler extends RenderHandler {
     requestedTile: TileCoordinates;
     longitude: number;
     latitude: number;
+    urlTemplate: URLTemplate;
+    layerNames: string[];
     currentLayer?: LayerSimple;
   }) {
     return (

@@ -59,15 +59,9 @@ export class Color {
     matches = rgbParenthesesMatcher.exec(color);
     if (matches !== null) {
       const result = new Color();
-      result.red =
-        parseFloat(matches[1]) /
-        ("%" === matches[1].substr(-1) ? 100.0 : 255.0);
-      result.green =
-        parseFloat(matches[2]) /
-        ("%" === matches[2].substr(-1) ? 100.0 : 255.0);
-      result.blue =
-        parseFloat(matches[3]) /
-        ("%" === matches[3].substr(-1) ? 100.0 : 255.0);
+      result.red = parseFloat(matches[1]) / ("%" === matches[1].substr(-1) ? 100.0 : 255.0);
+      result.green = parseFloat(matches[2]) / ("%" === matches[2].substr(-1) ? 100.0 : 255.0);
+      result.blue = parseFloat(matches[3]) / ("%" === matches[3].substr(-1) ? 100.0 : 255.0);
       result.alpha = parseFloat(defaultValue(matches[4], "1.0"));
       return result;
     }
@@ -78,7 +72,7 @@ export class Color {
         parseFloat(matches[1]) / 360.0,
         parseFloat(matches[2]) / 100.0,
         parseFloat(matches[3]) / 100.0,
-        parseFloat(defaultValue(matches[4], "1.0"))
+        parseFloat(defaultValue(matches[4], "1.0")),
       );
     }
     return undefined;
@@ -88,7 +82,7 @@ export class Color {
     hue?: number,
     saturation?: number,
     lightness?: number,
-    alpha?: number
+    alpha?: number,
   ): Color | undefined {
     hue = defaultValue(hue, 0.0) % 1.0;
     saturation = defaultValue(saturation, 0.0);

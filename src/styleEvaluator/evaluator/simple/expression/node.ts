@@ -239,9 +239,7 @@ export class Node {
   _evaluateNot(feature?: Feature) {
     const left = this._left.evaluate(feature);
     if (typeof left !== "boolean") {
-      throw new Error(
-        `Operator "!" requires a boolean argument. Argument is ${left}.`
-      );
+      throw new Error(`Operator "!" requires a boolean argument. Argument is ${left}.`);
     }
     return !left;
   }
@@ -251,17 +249,13 @@ export class Node {
       return -left;
     }
 
-    throw new Error(
-      `Operator "-" requires a vector or number argument. Argument is ${left}.`
-    );
+    throw new Error(`Operator "-" requires a vector or number argument. Argument is ${left}.`);
   }
   _evaluatePositive(feature?: Feature) {
     const left = this._left.evaluate(feature);
 
     if (!(typeof left === "number")) {
-      throw new Error(
-        `Operator "+" requires a vector or number argument. Argument is ${left}.`
-      );
+      throw new Error(`Operator "+" requires a vector or number argument. Argument is ${left}.`);
     }
 
     return left;
@@ -271,9 +265,7 @@ export class Node {
     const right = this._right.evaluate(feature);
 
     if (typeof left !== "number" || typeof right !== "number") {
-      console.warn(
-        `Operator "<" requires number arguments. Arguments are ${left} and ${right}.`
-      );
+      console.warn(`Operator "<" requires number arguments. Arguments are ${left} and ${right}.`);
       return false;
     }
 
@@ -284,9 +276,7 @@ export class Node {
     const right = this._right.evaluate(feature);
 
     if (typeof left !== "number" || typeof right !== "number") {
-      console.warn(
-        `Operator "<=" requires number arguments. Arguments are ${left} and ${right}.`
-      );
+      console.warn(`Operator "<=" requires number arguments. Arguments are ${left} and ${right}.`);
       return false;
     }
 
@@ -297,9 +287,7 @@ export class Node {
     const right = this._right.evaluate(feature);
 
     if (typeof left !== "number" || typeof right !== "number") {
-      console.warn(
-        `Operator ">" requires number arguments. Arguments are ${left} and ${right}.`
-      );
+      console.warn(`Operator ">" requires number arguments. Arguments are ${left} and ${right}.`);
       return false;
     }
 
@@ -310,9 +298,7 @@ export class Node {
     const right = this._right.evaluate(feature);
 
     if (typeof left !== "number" || typeof right !== "number") {
-      console.warn(
-        `Operator ">=" requires number arguments. Arguments are ${left} and ${right}.`
-      );
+      console.warn(`Operator ">=" requires number arguments. Arguments are ${left} and ${right}.`);
       return false;
     }
 
@@ -321,9 +307,7 @@ export class Node {
   _evaluateOr(feature?: Feature) {
     const left = this._left.evaluate(feature);
     if (typeof left !== "boolean") {
-      console.warn(
-        `Operator "||" requires boolean arguments. First argument is ${left}.`
-      );
+      console.warn(`Operator "||" requires boolean arguments. First argument is ${left}.`);
       return false;
     }
 
@@ -334,9 +318,7 @@ export class Node {
 
     const right = this._right.evaluate(feature);
     if (typeof right !== "boolean") {
-      console.warn(
-        `Operator "||" requires boolean arguments. Second argument is ${right}.`
-      );
+      console.warn(`Operator "||" requires boolean arguments. Second argument is ${right}.`);
       return false;
     }
 
@@ -345,9 +327,7 @@ export class Node {
   _evaluateAnd(feature?: Feature) {
     const left = this._left.evaluate(feature);
     if (typeof left !== "boolean") {
-      console.warn(
-        `Operator "&&" requires boolean arguments. First argument is ${left}.`
-      );
+      console.warn(`Operator "&&" requires boolean arguments. First argument is ${left}.`);
       return false;
     }
 
@@ -358,9 +338,7 @@ export class Node {
 
     const right = this._right.evaluate(feature);
     if (typeof right !== "boolean") {
-      console.warn(
-        `Operator "&&" requires boolean arguments. Second argument is ${right}.`
-      );
+      console.warn(`Operator "&&" requires boolean arguments. Second argument is ${right}.`);
       return false;
     }
 
@@ -374,7 +352,7 @@ export class Node {
     }
 
     throw new Error(
-      `Operator "+" requires vector or number arguments of matching types, or at least one string argument. Arguments are ${left} and ${right}.`
+      `Operator "+" requires vector or number arguments of matching types, or at least one string argument. Arguments are ${left} and ${right}.`,
     );
   }
   _evaluateMinus(feature?: Feature) {
@@ -385,7 +363,7 @@ export class Node {
     }
 
     throw new Error(
-      `Operator "-" requires vector or number arguments of matching types. Arguments are ${left} and ${right}.`
+      `Operator "-" requires vector or number arguments of matching types. Arguments are ${left} and ${right}.`,
     );
   }
   _evaluateTimes(feature?: Feature) {
@@ -396,7 +374,7 @@ export class Node {
     }
 
     throw new Error(
-      `Operator "*" requires vector or number arguments. If both arguments are vectors they must be matching types. Arguments are ${left} and ${right}.`
+      `Operator "*" requires vector or number arguments. If both arguments are vectors they must be matching types. Arguments are ${left} and ${right}.`,
     );
   }
   _evaluateDivide(feature?: Feature) {
@@ -407,7 +385,7 @@ export class Node {
     }
 
     throw new Error(
-      `Operator "/" requires vector or number arguments of matching types, or a number as the second argument. Arguments are ${left} and ${right}.`
+      `Operator "/" requires vector or number arguments of matching types, or a number as the second argument. Arguments are ${left} and ${right}.`,
     );
   }
   _evaluateMod(feature?: Feature) {
@@ -418,7 +396,7 @@ export class Node {
     }
 
     throw new Error(
-      `Operator "%" requires vector or number arguments of matching types. Arguments are ${left} and ${right}.`
+      `Operator "%" requires vector or number arguments of matching types. Arguments are ${left} and ${right}.`,
     );
   }
   _evaluateEqualsStrict(feature?: Feature): boolean {
@@ -439,7 +417,7 @@ export class Node {
 
     if (typeof test !== "boolean") {
       throw new Error(
-        `Conditional argument of conditional expression must be a boolean. Argument is ${test}.`
+        `Conditional argument of conditional expression must be a boolean. Argument is ${test}.`,
       );
     }
 
@@ -459,9 +437,7 @@ export class Node {
     return Boolean(this._left.evaluate(feature));
   }
   _evaluateNumberConversion(feature?: Feature): number {
-    const cleanedNumberInput = cleanseNumberStringInput(
-      this._left.evaluate(feature)
-    );
+    const cleanedNumberInput = cleanseNumberStringInput(this._left.evaluate(feature));
     return Number(cleanedNumberInput);
   }
   _evaluateStringConversion(feature?: Feature): string {
@@ -502,7 +478,7 @@ export class Node {
         args[0].evaluate(feature),
         args[1].evaluate(feature),
         args[2].evaluate(feature),
-        255
+        255,
       );
     } else if (this._value === "rgba") {
       // convert between css alpha (0 to 1) and cesium alpha (0 to 255)
@@ -511,14 +487,14 @@ export class Node {
         args[0].evaluate(feature),
         args[1].evaluate(feature),
         args[2].evaluate(feature),
-        a
+        a,
       );
     } else if (this._value === "hsl") {
       const hsl = Color.fromHsl(
         args[0].evaluate(feature),
         args[1].evaluate(feature),
         args[2].evaluate(feature),
-        1.0
+        1.0,
       );
       if (hsl) color = hsl;
     } else if (this._value === "hsla") {
@@ -526,7 +502,7 @@ export class Node {
         args[0].evaluate(feature),
         args[1].evaluate(feature),
         args[2].evaluate(feature),
-        args[3].evaluate(feature)
+        args[3].evaluate(feature),
       );
       if (hsl) color = hsl;
     }
@@ -546,9 +522,7 @@ export class Node {
     }
 
     if (isArray(right) && isArray(left)) {
-      console.error(
-        "Equals left and right both can't be array at the same time"
-      );
+      console.error("Equals left and right both can't be array at the same time");
     }
 
     return left == right;
@@ -566,9 +540,7 @@ export class Node {
     }
 
     if (isArray(right) && isArray(left)) {
-      console.error(
-        "NotEquals left and right both can't be array at the same time"
-      );
+      console.error("NotEquals left and right both can't be array at the same time");
     }
 
     return left != right;

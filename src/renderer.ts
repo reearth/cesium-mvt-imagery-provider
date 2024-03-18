@@ -346,6 +346,10 @@ export class Renderer {
     if (tile) this._tileCaches.set(currentUrl, tile);
     return tile;
   }
+
+  clearCache() {
+    this._tileCaches.clear();
+  }
 }
 
 const tileToCacheable = (v: VectorTile | undefined) => {

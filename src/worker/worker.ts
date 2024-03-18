@@ -64,6 +64,9 @@ const renderTile = async ({
     renderOptions.currentLayer,
     updatedAt,
   );
+
+  tileRenderer.clearCache();
+
   await new Promise(resolve => {
     requestAnimationFrame(resolve);
   });

@@ -20,7 +20,6 @@ export class RenderMainHandler extends RenderHandler {
     urlTemplate: URLTemplate;
     layerNames: string[];
     currentLayer?: LayerSimple;
-    updatedAt?: number;
   }) {
     const ctx = options.canvas.getContext("2d");
     if (!ctx) {
@@ -31,7 +30,6 @@ export class RenderMainHandler extends RenderHandler {
       options.requestedTile,
       options.scaleFactor,
       options.currentLayer,
-      options.updatedAt,
     );
   }
 

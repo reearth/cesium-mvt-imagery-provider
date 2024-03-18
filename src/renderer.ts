@@ -33,8 +33,6 @@ const fetchResourceAsArrayBuffer = (url?: string) => {
     ?.catch(() => {});
 };
 
-let currentTime: number | undefined;
-
 export type RendererOption = Pick<ImageryProviderOption, "urlTemplate"> & {
   layerNames: string[];
 };
@@ -66,12 +64,11 @@ export class Renderer {
     requestedTile: TileCoordinates,
     scaleFactor: number,
     currentLayer?: Layer,
-    updatedAt?: number,
   ) {
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
     await Promise.all(
       this._layerNames.map(n =>
-        this._renderCanvas(url, context, requestedTile, n, scaleFactor, currentLayer, updatedAt),
+        this._renderCanvas(url, context, requestedTile, n, scaleFactor, currentLayer),
       ),
     );
   }
@@ -83,7 +80,6 @@ export class Renderer {
     layerName: string,
     scaleFactor: number,
     currentLayer?: Layer,
-    updatedAt?: number,
   ): Promise<void> {
     if (!url) return;
     console.log("reached here as well!!!");
@@ -119,17 +115,6 @@ export class Renderer {
 
       for (let i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
-
-        console.log("updateAT: ", updatedAt, "CurrentTime: ", currentTime);
-
-        // // Early return.
-        if (onRenderFeature(updatedAt)) {
-          console.log("this happened!!");
-          continue;
-        }
-
-        console.log("got past this!!");
-
         const style = evalStyle(feature, requestedTile, currentLayer);
 
         if (!style) {
@@ -385,11 +370,4 @@ const buildURLWithTileCoordinates = (template: URLTemplate, tile: TileCoordinate
   const x = z.replace("{x}", String(tile.x));
   const y = x.replace("{y}", String(tile.y));
   return y;
-};
-
-const onRenderFeature = (updatedAt?: number): boolean => {
-  if (!currentTime && !updatedAt) {
-    currentTime = updatedAt;
-  }
-  return currentTime === updatedAt;
 };

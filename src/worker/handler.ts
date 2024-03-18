@@ -22,7 +22,6 @@ export class RenderWorkerHandler extends RenderHandler {
     urlTemplate: URLTemplate;
     layerNames: string[];
     currentLayer?: LayerSimple;
-    updatedAt?: number;
   }): Promise<void> {
     const { canvas, ...optionsWithoutCanvas } = options;
     const offscreen = canvas.transferControlToOffscreen();

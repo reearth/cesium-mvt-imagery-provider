@@ -13,7 +13,6 @@ export abstract class RenderHandler {
     urlTemplate: URLTemplate;
     layerNames: string[];
     currentLayer?: LayerSimple;
-    updatedAt?: number;
   }): Promise<void>;
   abstract pick(options: {
     requestedTile: TileCoordinates;

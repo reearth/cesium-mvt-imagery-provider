@@ -43,7 +43,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _errorEvent = new CesiumEvent();
   private readonly _handler: RenderHandler;
   private readonly _currentLayer?: LayerSimple;
-  private readonly _updatedAt?: number;
   private readonly _useWorker?: boolean;
 
   private readonly _urlTemplate: URLTemplate;
@@ -76,7 +75,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       })
       .then(() => true);
     this._currentLayer = options.layer;
-    this._updatedAt = options.updatedAt;
     this._useWorker = options.worker ?? false;
   }
 
@@ -187,7 +185,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     canvas.width = this._tileWidth * scaleFactor;
     canvas.height = this._tileHeight * scaleFactor;
     const currentLayer = this._currentLayer;
-    const updatedAt = this._updatedAt;
     const urlTemplate = this._urlTemplate;
     const layerNames = this._layerNames;
 
@@ -202,7 +199,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           urlTemplate,
           layerNames,
           currentLayer,
-          updatedAt,
         })
         .then(() => {
           this.tileCache?.set(cacheKey, canvas);

@@ -7,6 +7,7 @@ import { LayerSimple } from "../styleEvaluator/types";
 import { TileCoordinates } from "../types";
 
 const tileRenderers = new Map<string, Renderer>();
+let lastUpdatedAt: number | undefined;
 
 function createTileRenderKey({ urlTemplate }: RendererOption): string {
   return `${urlTemplate}`;
@@ -25,6 +26,7 @@ export interface PickTileParams extends RendererOption {
   longitude: number;
   latitude: number;
   currentLayer?: LayerSimple;
+  updatedAt?: number;
 }
 
 async function getTileRenderer(options: RendererOption): Promise<Renderer> {
@@ -41,21 +43,27 @@ const renderTile = async ({
   requestedTile,
   canvas,
   scaleFactor,
+  updatedAt,
   ...renderOptions
 }: RenderTileParams): Promise<void> => {
+  if (updatedAt !== undefined && updatedAt !== lastUpdatedAt) {
+    lastUpdatedAt = updatedAt;
+    return;
+  }
+
   const context = canvas.getContext("2d") as OffscreenCanvasRenderingContext2D;
   if (!context) {
     return;
   }
+
   const tileRenderer = await getTileRenderer(renderOptions);
   await tileRenderer.render(
     context,
     requestedTile,
     scaleFactor,
     renderOptions.currentLayer,
-    renderOptions.updatedAt,
+    updatedAt,
   );
-
   await new Promise(resolve => {
     requestAnimationFrame(resolve);
   });
@@ -66,8 +74,14 @@ const pickTile = async ({
   longitude,
   latitude,
   currentLayer,
+  updatedAt,
   ...renderOptions
 }: PickTileParams): Promise<ImageryLayerFeatureInfo[]> => {
+  if (updatedAt !== undefined && updatedAt !== lastUpdatedAt) {
+    lastUpdatedAt = updatedAt;
+    return [];
+  }
+
   const tileRenderer = await getTileRenderer(renderOptions);
   return await tileRenderer.pickFeatures(requestedTile, longitude, latitude, currentLayer);
 };

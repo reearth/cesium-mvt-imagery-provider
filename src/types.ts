@@ -29,7 +29,6 @@ export type ImageryProviderOption = {
   resolution?: number;
   worker?: boolean;
   layer?: LayerSimple;
-  updatedAt?: number;
 };
 
 export const CESIUM_CANVAS_SIZE = 256;

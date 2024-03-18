@@ -33,8 +33,6 @@ const fetchResourceAsArrayBuffer = (url?: string) => {
     ?.catch(() => {});
 };
 
-// let currentTime: number | undefined;
-
 export type RendererOption = Pick<ImageryProviderOption, "urlTemplate"> & {
   layerNames: string[];
 };
@@ -66,12 +64,11 @@ export class Renderer {
     requestedTile: TileCoordinates,
     scaleFactor: number,
     currentLayer?: Layer,
-    updatedAt?: number,
   ) {
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
     await Promise.all(
       this._layerNames.map(n =>
-        this._renderCanvas(url, context, requestedTile, n, scaleFactor, currentLayer, updatedAt),
+        this._renderCanvas(url, context, requestedTile, n, scaleFactor, currentLayer),
       ),
     );
   }
@@ -83,12 +80,10 @@ export class Renderer {
     layerName: string,
     scaleFactor: number,
     currentLayer?: Layer,
-    _updatedAt?: number,
   ): Promise<void> {
     if (!url) return;
 
     const tile = await this._cachedTile(url);
-
     const layerNames = layerName.split(/, */).filter(Boolean);
     const layers = layerNames.map(ln => tile?.layers[ln]);
 
@@ -118,12 +113,6 @@ export class Renderer {
 
       for (let i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
-
-        // // Early return.
-        // if (onRenderFeature(updatedAt)) {
-        //   continue;
-        // }
-
         const style = evalStyle(feature, requestedTile, currentLayer);
 
         if (!style) {
@@ -334,10 +323,15 @@ export class Renderer {
   async _cachedTile(currentUrl: string) {
     if (!currentUrl) return;
     const cachedTile = this._tileCaches.get(currentUrl);
-    if (cachedTile) return cachedTile;
+    if (cachedTile) {
+      return cachedTile;
+    }
     const tile = tileToCacheable(await this._parseTile(currentUrl));
     if (tile) this._tileCaches.set(currentUrl, tile);
     return tile;
+  }
+  clearCache() {
+    this._tileCaches.clear();
   }
 }
 
@@ -375,10 +369,3 @@ const buildURLWithTileCoordinates = (template: URLTemplate, tile: TileCoordinate
   const y = x.replace("{y}", String(tile.y));
   return y;
 };
-
-// const onRenderFeature = (updatedAt?: number): boolean => {
-//   if (!currentTime && !updatedAt) {
-//     currentTime = updatedAt;
-//   }
-//   return currentTime === updatedAt;
-// };

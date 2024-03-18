@@ -1,4 +1,3 @@
-import { ImageryLayerFeatureInfo } from "cesium";
 import { Transfer } from "threads";
 
 import { RendererOption } from "../renderer";
@@ -22,7 +21,6 @@ export class RenderWorkerHandler extends RenderHandler {
     urlTemplate: URLTemplate;
     layerNames: string[];
     currentLayer?: LayerSimple;
-    updatedAt?: number;
   }): Promise<void> {
     const { canvas, ...optionsWithoutCanvas } = options;
     const offscreen = canvas.transferControlToOffscreen();
@@ -37,33 +35,6 @@ export class RenderWorkerHandler extends RenderHandler {
           [offscreen],
         ),
       );
-    });
-  }
-
-  pick(options: {
-    requestedTile: TileCoordinates;
-    longitude: number;
-    latitude: number;
-    urlTemplate: URLTemplate;
-    layerNames: string[];
-    currentLayer?: LayerSimple;
-  }): Promise<ImageryLayerFeatureInfo[]> {
-    return new Promise((resolve, reject) => {
-      queue(async task => {
-        try {
-          const result = await task.pickTile(
-            Transfer(
-              {
-                ...options,
-              },
-              [],
-            ),
-          );
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        }
-      });
     });
   }
 

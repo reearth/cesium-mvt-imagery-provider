@@ -37,7 +37,6 @@ export async function destroy(): Promise<void> {
   if (workerPool == null) {
     return;
   }
-  await workerPool.completed();
-  await workerPool.terminate();
+  await workerPool.terminate(true);
   workerPool = undefined;
 }

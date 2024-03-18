@@ -1,4 +1,3 @@
-import { ImageryLayerFeatureInfo } from "cesium";
 import { type TransferDescriptor } from "threads";
 import { expose } from "threads/worker";
 
@@ -17,7 +16,6 @@ export interface RenderTileParams extends RendererOption {
   canvas: OffscreenCanvas;
   scaleFactor: number;
   currentLayer?: LayerSimple;
-  updatedAt?: number;
 }
 
 export interface PickTileParams extends RendererOption {
@@ -29,7 +27,7 @@ export interface PickTileParams extends RendererOption {
 
 async function getTileRenderer(options: RendererOption): Promise<Renderer> {
   const key = createTileRenderKey(options);
-  let tileRenderer = tileRenderers.get(key);
+  let tileRenderer;
   if (tileRenderer == null) {
     tileRenderer = new Renderer(options);
     tileRenderers.set(key, tileRenderer);
@@ -47,37 +45,21 @@ const renderTile = async ({
   if (!context) {
     return;
   }
+
   const tileRenderer = await getTileRenderer(renderOptions);
-  await tileRenderer.render(
-    context,
-    requestedTile,
-    scaleFactor,
-    renderOptions.currentLayer,
-    renderOptions.updatedAt,
-  );
+  await tileRenderer.render(context, requestedTile, scaleFactor, renderOptions.currentLayer);
+
+  tileRenderer.clearCache();
 
   await new Promise(resolve => {
     requestAnimationFrame(resolve);
   });
 };
 
-const pickTile = async ({
-  requestedTile,
-  longitude,
-  latitude,
-  currentLayer,
-  ...renderOptions
-}: PickTileParams): Promise<ImageryLayerFeatureInfo[]> => {
-  const tileRenderer = await getTileRenderer(renderOptions);
-  return await tileRenderer.pickFeatures(requestedTile, longitude, latitude, currentLayer);
-};
-
 expose({
   renderTile,
-  pickTile,
 });
 
 export type RendererWorker = object & {
   renderTile: (params: TransferDescriptor<RenderTileParams>) => void;
-  pickTile: (params: TransferDescriptor<PickTileParams>) => ImageryLayerFeatureInfo[];
 };

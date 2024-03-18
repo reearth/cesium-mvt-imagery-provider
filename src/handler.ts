@@ -20,7 +20,6 @@ export class RenderMainHandler extends RenderHandler {
     urlTemplate: URLTemplate;
     layerNames: string[];
     currentLayer?: LayerSimple;
-    updatedAt?: number;
   }) {
     const ctx = options.canvas.getContext("2d");
     if (!ctx) {
@@ -31,25 +30,6 @@ export class RenderMainHandler extends RenderHandler {
       options.requestedTile,
       options.scaleFactor,
       options.currentLayer,
-      options.updatedAt,
-    );
-  }
-
-  async pick(options: {
-    requestedTile: TileCoordinates;
-    longitude: number;
-    latitude: number;
-    urlTemplate: URLTemplate;
-    layerNames: string[];
-    currentLayer?: LayerSimple;
-  }) {
-    return (
-      (await this.renderer?.pickFeatures(
-        options.requestedTile,
-        options.longitude,
-        options.latitude,
-        options.currentLayer,
-      )) ?? []
     );
   }
 

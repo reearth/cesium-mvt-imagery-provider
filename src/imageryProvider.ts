@@ -9,9 +9,11 @@ import {
   Credit,
   ImageryLayerFeatureInfo,
 } from "cesium";
+import { isEqual } from "lodash-es";
 import { LRUCache } from "lru-cache";
 
 import { RenderMainHandler } from "./handler";
+import { Renderer } from "./renderer";
 import { RenderHandler } from "./renderHandler";
 import { LayerSimple } from "./styleEvaluator/types";
 import { CESIUM_CANVAS_SIZE, ImageryProviderOption, TileCoordinates, URLTemplate } from "./types";
@@ -19,6 +21,8 @@ import { RenderWorkerHandler } from "./worker/handler";
 import { canQueue } from "./worker/workerPool";
 
 type ImageryProviderTrait = ImageryProvider;
+
+let layerUsed: LayerSimple | undefined;
 
 export class MVTImageryProvider implements ImageryProviderTrait {
   static maximumTasks = 50;
@@ -43,7 +47,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
   private readonly _errorEvent = new CesiumEvent();
   private readonly _handler: RenderHandler;
   private readonly _currentLayer?: LayerSimple;
-  private readonly _updatedAt?: number;
   private readonly _useWorker?: boolean;
 
   private readonly _urlTemplate: URLTemplate;
@@ -76,7 +79,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       })
       .then(() => true);
     this._currentLayer = options.layer;
-    this._updatedAt = options.updatedAt;
     this._useWorker = options.worker ?? false;
   }
 
@@ -163,6 +165,12 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     level: number,
     _request?: Request | undefined,
   ): Promise<ImageryTypes> | undefined {
+    const currentLayer = this._currentLayer;
+
+    if (!isEqual(layerUsed, currentLayer)) {
+      return;
+    }
+    layerUsed = currentLayer;
     if (
       this._useWorker &&
       (this.taskCount >= MVTImageryProvider.maximumTasksPerImagery ||
@@ -186,8 +194,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     const scaleFactor = (level >= this.maximumLevel ? this._resolution : undefined) ?? 1;
     canvas.width = this._tileWidth * scaleFactor;
     canvas.height = this._tileHeight * scaleFactor;
-    const currentLayer = this._currentLayer;
-    const updatedAt = this._updatedAt;
     const urlTemplate = this._urlTemplate;
     const layerNames = this._layerNames;
 
@@ -202,7 +208,6 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           urlTemplate,
           layerNames,
           currentLayer,
-          updatedAt,
         })
         .then(() => {
           this.tileCache?.set(cacheKey, canvas);
@@ -237,14 +242,14 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     const urlTemplate = this._urlTemplate;
     const layerNames = this._layerNames;
 
-    return this._handler.pick({
-      requestedTile,
-      longitude,
-      latitude,
-      urlTemplate,
-      layerNames,
-      currentLayer,
-    });
+    return (
+      (await new Renderer({ urlTemplate, layerNames }).pickFeatures(
+        requestedTile,
+        longitude,
+        latitude,
+        currentLayer,
+      )) ?? []
+    );
   }
 
   dispose() {

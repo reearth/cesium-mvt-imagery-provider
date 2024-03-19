@@ -168,7 +168,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     const currentLayer = this._currentLayer;
 
     if (!isEqual(layerUsed, currentLayer)) {
-      return;
+      this.dispose();
     }
     layerUsed = currentLayer;
     if (

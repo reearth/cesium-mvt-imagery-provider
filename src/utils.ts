@@ -89,3 +89,51 @@ export const generateID = (id: string) => {
 
   return hash.toString(16);
 };
+
+export function dataTileForDisplayTile(
+  displayTile: TileCoordinates,
+  maximumLevel: number,
+  levelDiff = 2,
+) {
+  let dataTile: TileCoordinates;
+  let scale = 1;
+  let dim = 1024;
+  let origin: Point;
+  if (displayTile.level < levelDiff) {
+    dataTile = { level: 0, x: 0, y: 0 };
+    scale = 1 / (1 << (levelDiff - displayTile.level));
+    origin = new Point(0, 0);
+    dim = dim * scale;
+  } else if (displayTile.level <= levelDiff + maximumLevel) {
+    const f = 1 << levelDiff;
+    dataTile = {
+      level: displayTile.level - levelDiff,
+      x: Math.floor(displayTile.x / f),
+      y: Math.floor(displayTile.y / f),
+    };
+    origin = new Point(dataTile.x * f * 256, dataTile.y * f * 256);
+  } else {
+    scale = 1 << (displayTile.level - maximumLevel - levelDiff);
+    const f = 1 << levelDiff;
+    dataTile = {
+      level: maximumLevel,
+      x: Math.floor(displayTile.x / f / scale),
+      y: Math.floor(displayTile.y / f / scale),
+    };
+    origin = new Point(dataTile.x * f * scale * 256, dataTile.y * f * scale * 256);
+    dim = dim * scale;
+  }
+  return { dataTile: dataTile, scale: scale, origin: origin, dim: dim };
+}
+
+export const transformGeom = (geom: Array<Array<Point>>, scale: number, translate: Point) => {
+  const retval = [];
+  for (const arr of geom) {
+    const loop = [];
+    for (const coord of arr) {
+      loop.push(coord.clone().mult(scale).add(translate));
+    }
+    retval.push(loop);
+  }
+  return retval;
+};

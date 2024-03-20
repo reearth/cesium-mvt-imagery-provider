@@ -15,6 +15,7 @@ export interface RenderTileParams extends RendererOption {
   requestedTile: TileCoordinates;
   canvas: OffscreenCanvas;
   scaleFactor: number;
+  maximumLevel: number;
   currentLayer?: LayerSimple;
 }
 
@@ -39,6 +40,7 @@ const renderTile = async ({
   requestedTile,
   canvas,
   scaleFactor,
+  maximumLevel,
   ...renderOptions
 }: RenderTileParams): Promise<void> => {
   const context = canvas.getContext("2d") as OffscreenCanvasRenderingContext2D;
@@ -47,7 +49,13 @@ const renderTile = async ({
   }
 
   const tileRenderer = await getTileRenderer(renderOptions);
-  await tileRenderer.render(context, requestedTile, scaleFactor, renderOptions.currentLayer);
+  await tileRenderer.render(
+    context,
+    requestedTile,
+    scaleFactor,
+    maximumLevel,
+    renderOptions.currentLayer,
+  );
 
   tileRenderer.clearCache();
 

@@ -8,7 +8,10 @@ import { onSelectFeature } from "./featureSelect";
 import { evalStyle } from "./style";
 import { Layer, LayerSimple } from "./styleEvaluator/types";
 import { isFeatureClicked } from "./terria";
-import { TileCoordinates, URLTemplate, CESIUM_CANVAS_SIZE, ImageryProviderOption } from "./types";
+import { TileCoordinates, URLTemplate, ImageryProviderOption, CESIUM_CANVAS_SIZE } from "./types";
+import { dataTileForDisplayTile, transformGeom } from "./utils";
+
+const MAX_VERTICES_PER_CALL = 5400;
 
 const defaultParseTile = async (url?: string) => {
   const ab = await fetchResourceAsArrayBuffer(url);
@@ -47,6 +50,8 @@ export class Renderer {
   private readonly _layerNames: string[];
   private readonly _tileWidth: number;
   private readonly _tileHeight: number;
+  // private readonly internalSize = 256;
+  // private readonly paddingSize = 16;
 
   private readonly _tileCaches = new Map<string, VectorTile>();
 
@@ -63,12 +68,14 @@ export class Renderer {
     context: RenderingContext2D,
     requestedTile: TileCoordinates,
     scaleFactor: number,
+    maximumLevel: number,
     currentLayer?: Layer,
   ) {
+    if (requestedTile.level >= 19) requestedTile.level = 24;
     const url = buildURLWithTileCoordinates(this._urlTemplate, requestedTile);
     await Promise.all(
       this._layerNames.map(n =>
-        this._renderCanvas(url, context, requestedTile, n, scaleFactor, currentLayer),
+        this._renderCanvas(url, context, requestedTile, n, scaleFactor, maximumLevel, currentLayer),
       ),
     );
   }
@@ -79,6 +86,7 @@ export class Renderer {
     requestedTile: TileCoordinates,
     layerName: string,
     scaleFactor: number,
+    maximumLevel: number,
     currentLayer?: Layer,
   ): Promise<void> {
     if (!url) return;
@@ -96,6 +104,7 @@ export class Renderer {
     context.lineWidth = 1;
 
     // Improve resolution
+    context.save();
     context.miterLimit = 2;
     context.setTransform(
       (this._tileWidth * scaleFactor) / CESIUM_CANVAS_SIZE,
@@ -106,15 +115,46 @@ export class Renderer {
       0,
     );
 
+    // const bbox = {
+    //   minX: this.internalSize * requestedTile.x - this.paddingSize,
+    //   minY: this.internalSize * requestedTile.y - this.paddingSize,
+    //   maxX: this.internalSize * (requestedTile.x + 1) + this.paddingSize,
+    //   maxY: this.internalSize * (requestedTile.y + 1) + this.paddingSize,
+    // };
+
+    // const o = new Point(this.internalSize * requestedTile.x, this.internalSize * requestedTile.y);
+
     layers.forEach(layer => {
       if (!layer) return;
       // Vector tile works with extent [0, 4095], but canvas is only [0,255]
       const extentFactor = CESIUM_CANVAS_SIZE / layer.extent;
 
+      const { scale } = dataTileForDisplayTile(requestedTile, maximumLevel);
+      context.save();
+      // context.translate(origin.x - o.x, origin.y - o.y);
+
       for (let i = 0; i < layer.length; i++) {
         const feature = layer.feature(i);
-        const style = evalStyle(feature, requestedTile, currentLayer);
 
+        let coordinates = feature.loadGeometry();
+        // const fbox = feature.bbox?.();
+        // if (
+        //   fbox &&
+        //   (fbox[2] * scale + origin.x < bbox.minX ||
+        //     fbox[0] * scale + origin.x > bbox.maxX ||
+        //     fbox[1] * scale + origin.y > bbox.maxY ||
+        //     fbox[3] * scale + origin.y < bbox.minY)
+        // ) {
+        //   continue;
+        // }
+
+        console.log("scale: ", scale);
+
+        if (scale !== 1) {
+          coordinates = transformGeom(coordinates, scale, new Point(0, 0));
+        }
+
+        const style = evalStyle(feature, requestedTile, currentLayer);
         if (!style) {
           continue;
         }
@@ -124,11 +164,11 @@ export class Renderer {
         context.lineJoin = style.lineJoin ?? context.lineJoin;
 
         if (VectorTileFeature.types[feature.type] === "Polygon") {
-          this._renderPolygon(context, feature, extentFactor, (style.lineWidth ?? 1) > 0);
+          this._renderPolygon(context, coordinates, extentFactor, (style.lineWidth ?? 1) > 0);
         } else if (VectorTileFeature.types[feature.type] === "Point") {
-          this._renderPoint(context, feature, extentFactor);
+          this._renderPoint(context, coordinates, extentFactor);
         } else if (VectorTileFeature.types[feature.type] === "LineString") {
-          this._renderLineString(context, feature, extentFactor);
+          this._renderLineString(context, coordinates, extentFactor);
         } else {
           console.error(
             `Unexpected geometry type: ${feature.type} in region map on tile ${[
@@ -144,13 +184,11 @@ export class Renderer {
 
   _renderPolygon(
     context: RenderingContext2D,
-    feature: VectorTileFeature,
+    coordinates: Point[][],
     extentFactor: number,
     shouldRenderLine: boolean,
   ) {
     context.beginPath();
-
-    const coordinates = feature.loadGeometry();
 
     const draw = () => {
       if (shouldRenderLine) {
@@ -163,7 +201,7 @@ export class Renderer {
     // Polygon rings
     for (let i2 = 0; i2 < coordinates.length; i2++) {
       const v = coordinates[i2];
-      if (verticesLength + v.length > 5400) {
+      if (verticesLength + v.length > MAX_VERTICES_PER_CALL) {
         draw();
         verticesLength = 0;
         context.beginPath();
@@ -183,10 +221,8 @@ export class Renderer {
     if (verticesLength > 0) draw();
   }
 
-  _renderPoint(context: RenderingContext2D, feature: VectorTileFeature, extentFactor: number) {
+  _renderPoint(context: RenderingContext2D, coordinates: Point[][], extentFactor: number) {
     context.beginPath();
-
-    const coordinates = feature.loadGeometry();
 
     for (let i2 = 0; i2 < coordinates.length; i2++) {
       const pos = coordinates[i2][0];
@@ -201,10 +237,8 @@ export class Renderer {
     }
   }
 
-  _renderLineString(context: RenderingContext2D, feature: VectorTileFeature, extentFactor: number) {
+  _renderLineString(context: RenderingContext2D, coordinates: Point[][], extentFactor: number) {
     context.beginPath();
-
-    const coordinates = feature.loadGeometry();
 
     for (let i2 = 0; i2 < coordinates.length; i2++) {
       let pos = coordinates[i2][0];

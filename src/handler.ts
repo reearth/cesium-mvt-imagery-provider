@@ -19,6 +19,7 @@ export class RenderMainHandler extends RenderHandler {
     scaleFactor: number;
     urlTemplate: URLTemplate;
     layerNames: string[];
+    maximumLevel: number;
     currentLayer?: LayerSimple;
   }) {
     const ctx = options.canvas.getContext("2d");
@@ -29,6 +30,7 @@ export class RenderMainHandler extends RenderHandler {
       ctx,
       options.requestedTile,
       options.scaleFactor,
+      options.maximumLevel,
       options.currentLayer,
     );
   }

@@ -159,6 +159,25 @@ export class MVTImageryProvider implements ImageryProviderTrait {
     return [];
   }
 
+  // private waitForLayerChange(
+  //   initialLayer: LayerSimple | undefined,
+  //   waitTime = 1000,
+  // ): Promise<void> {
+  //   return new Promise(resolve => {
+  //     const startTime = Date.now();
+
+  //     const checkLayerChange = () => {
+  //       if (!isEqual(initialLayer, this._currentLayer) || Date.now() - startTime > waitTime) {
+  //         resolve();
+  //       } else {
+  //         setTimeout(checkLayerChange, 50); // Check every 50ms
+  //       }
+  //     };
+
+  //     checkLayerChange();
+  //   });
+  // }
+
   requestImage(
     x: number,
     y: number,
@@ -191,7 +210,8 @@ export class MVTImageryProvider implements ImageryProviderTrait {
       level,
     };
 
-    const scaleFactor = (level >= this.maximumLevel ? this._resolution : undefined) ?? 1;
+    const maximumLevel = this.maximumLevel;
+    const scaleFactor = (level >= maximumLevel ? this._resolution : undefined) ?? 1;
     canvas.width = this._tileWidth * scaleFactor;
     canvas.height = this._tileHeight * scaleFactor;
     const urlTemplate = this._urlTemplate;
@@ -207,6 +227,7 @@ export class MVTImageryProvider implements ImageryProviderTrait {
           scaleFactor,
           urlTemplate,
           layerNames,
+          maximumLevel,
           currentLayer,
         })
         .then(() => {

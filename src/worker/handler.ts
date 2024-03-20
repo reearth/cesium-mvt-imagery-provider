@@ -20,6 +20,7 @@ export class RenderWorkerHandler extends RenderHandler {
     scaleFactor: number;
     urlTemplate: URLTemplate;
     layerNames: string[];
+    maximumLevel: number;
     currentLayer?: LayerSimple;
   }): Promise<void> {
     const { canvas, ...optionsWithoutCanvas } = options;

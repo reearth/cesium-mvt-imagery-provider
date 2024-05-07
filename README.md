@@ -2,18 +2,27 @@
 
 ## Usage
 
+npm
+
+```
+npm i cesium cesium-mvt-imagery-provider
+```
+
 ```ts
-const imageryProvider = new MVTImageryProvider({
+import { Viewer } from "cesium";
+import CesiumMVTImageryProvider from "cesium-mvt-imagery-provider";
+
+const imageryProvider = new CesiumMVTImageryProvider({
   urlTemplate: "http://localhost:8080/sample_mvt/{z}/{x}/{y}.mvt",
   layerName: "layerName", // or "layerName1,layerName2,layerName3"
-  style: _feature => {
+  style: feature => {
     return {
       strokeStyle: "green",
       fillStyle: "green",
       lineWidth: 1,
     };
   },
-  onSelectFeature: _feature => {
+  onSelectFeature: feature => {
     console.log("Feature is selected");
   },
   credit: "cesium.js",
@@ -38,9 +47,3 @@ See example directory for more details.
 
 If you run example, you need to set sample MVT data to `./example/public`.
 And you should change `layerName` option for `MVTImageryProvider` in `./example/src/Imagery.tsx`.
-
-If you want to run this library on your vite project, you can do it like the following.
-
-1. `yarn build`
-2. `cp ./dist ~/your_project && rm -rf node_modules/.vite`
-3. Restart your project server

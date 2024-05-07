@@ -67,7 +67,7 @@ type ImageryProviderTrait = ImageryProvider;
 
 const CESIUM_CANVAS_SIZE = 256;
 
-export class MVTImageryProvider implements ImageryProviderTrait {
+export class CesiumMVTImageryProvider implements ImageryProviderTrait {
   // Options
   private readonly _minimumLevel: number;
   private readonly _maximumLevel: number;
@@ -556,3 +556,5 @@ function featureHandlerOrNumber(
   }
   return f(feature, tileCoords);
 }
+
+export default CesiumMVTImageryProvider;

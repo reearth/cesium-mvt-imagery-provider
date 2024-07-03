@@ -1,4 +1,4 @@
-import { MVTImageryProvider } from "cesium-mvt-imagery-provider";
+import { CesiumMVTImageryProvider } from "cesium-mvt-imagery-provider";
 import { FC, useEffect, useState } from "react";
 import { useCesium } from "resium";
 
@@ -6,7 +6,7 @@ export const Imagery: FC = () => {
   const { viewer } = useCesium();
   const [isFeatureSelected, setIsFeatureSelected] = useState<boolean>(false);
   useEffect(() => {
-    const imageryProvider = new MVTImageryProvider({
+    const imageryProvider = new CesiumMVTImageryProvider({
       urlTemplate: "/sample_mvt/{z}/{x}/{y}.mvt",
       layerName: "layerName",
       onRenderFeature: () => {

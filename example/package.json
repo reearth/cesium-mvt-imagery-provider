@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "cesium": "1.103.0",
+    "cesium-mvt-imagery-provider": "^1.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "resium": "^1.16.0"

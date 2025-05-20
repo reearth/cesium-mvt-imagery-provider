@@ -18,8 +18,8 @@ import Pbf from "pbf";
 import { isFeatureClicked } from "./terria";
 import { isLineStringClicked, isPointClicked } from "./util";
 
-const defaultParseTile = async (url?: string) => {
-  const ab = await fetchResourceAsArrayBuffer(url);
+const defaultParseTile = async (url?: string, headers?: any) => {
+  const ab = await fetchResourceAsArrayBuffer(url, headers);
   if (!ab) {
     return;
   }
@@ -49,6 +49,7 @@ type FeatureHandler<R> = (feature: VectorTileFeature, tileCoords: TileCoordinate
 export type ImageryProviderOption = {
   urlTemplate: URLTemplate;
   layerName: string;
+  headers?: any;
   minimumLevel?: number;
   maximumLevel?: number;
   maximumNativeZoom?: number;
@@ -75,12 +76,13 @@ export class CesiumMVTImageryProvider implements ImageryProviderTrait {
   private readonly _layerNames: string[];
   private readonly _credit?: string;
   private readonly _resolution?: number;
+  private readonly _headers?: any;
   private _currentUrl?: string;
   private _onRenderFeature?: FeatureHandler<boolean | void>;
   private _onFeaturesRendered?: () => void;
   private _style?: FeatureHandler<Style>;
   private _onSelectFeature?: FeatureHandler<ImageryLayerFeatureInfo | void>;
-  private _parseTile: (url?: string) => Promise<VectorTile | undefined>;
+  private _parseTile: (url?: string, headers?: any) => Promise<VectorTile | undefined>;
   private _pickPointRadius: number | FeatureHandler<number>;
   private _pickLineWidth: number | FeatureHandler<number>;
 
@@ -101,6 +103,7 @@ export class CesiumMVTImageryProvider implements ImageryProviderTrait {
     this._layerNames = options.layerName.split(/, */).filter(Boolean);
     this._credit = options.credit;
     this._resolution = options.resolution ?? 5;
+    this._headers = options.headers;
     this._onFeaturesRendered = options.onFeaturesRendered;
     this._onRenderFeature = options.onRenderFeature;
     this._style = options.style;
@@ -493,7 +496,7 @@ export class CesiumMVTImageryProvider implements ImageryProviderTrait {
     if (!currentUrl) return;
     const cachedTile = this._tileCaches.get(currentUrl);
     if (cachedTile) return cachedTile;
-    const tile = tileToCacheable(await this._parseTile(currentUrl));
+    const tile = tileToCacheable(await this._parseTile(currentUrl, this._headers));
     if (tile) this._tileCaches.set(currentUrl, tile);
     return tile;
   }
@@ -538,12 +541,12 @@ const tileToCacheable = (v: VectorTile | undefined) => {
   return { layers };
 };
 
-const fetchResourceAsArrayBuffer = (url?: string) => {
+const fetchResourceAsArrayBuffer = (url?: string, headers?: any) => {
   if (!url) {
     throw new Error("fetch request is failed because request url is undefined");
   }
 
-  return Resource.fetchArrayBuffer({ url })?.catch(() => {});
+  return Resource.fetchArrayBuffer({ url, headers })?.catch(() => {});
 };
 
 function featureHandlerOrNumber(

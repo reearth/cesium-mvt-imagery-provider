@@ -7,12 +7,12 @@ jobs:
     name: lib
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "path=$(yarn cache dir)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@v3
+      - uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.path }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
